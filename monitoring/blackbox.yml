@@ -1,0 +1,10 @@
+modules:
+  https_forwarded:
+    prober: http
+    timeout: 8s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      headers:
+        X-Forwarded-Proto: https
+      valid_status_codes: [200]

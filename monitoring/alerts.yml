@@ -1,0 +1,55 @@
+groups:
+  - name: poshraw-availability
+    rules:
+      - alert: PoshrawApiUnavailable
+        expr: up{job="poshraw-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: POSHRAW API metrics endpoint is unavailable
+          description: Prometheus cannot scrape the API. Check the application container and database.
+
+      - alert: PoshrawHealthCheckFailed
+        expr: probe_success{job="poshraw-health"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: POSHRAW health check is failing
+          description: "The health probe for {{ $labels.instance }} has failed for at least two minutes."
+
+      - alert: PoshrawHighServerErrorRate
+        expr: |
+          sum(rate(poshraw_http_requests_total{status_code=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(poshraw_http_requests_total[5m])), 0.001)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: POSHRAW server error rate is above 5%
+          description: More than 5% of application requests have returned server errors for five minutes.
+
+      - alert: PoshrawSlowRequests
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(poshraw_http_request_duration_seconds_bucket[5m]))
+          ) > 1.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: POSHRAW p95 request latency exceeds 1.5 seconds
+          description: The 95th percentile of application request duration has exceeded 1.5 seconds.
+
+      - alert: PoshrawBrowserErrors
+        expr: sum(increase(poshraw_browser_errors_total[10m])) >= 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Browser errors are being reported
+          description: At least five privacy-safe browser error reports were received in ten minutes.

@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Playfair+Display:ital,wght@0,500;0,600;1,500;1,600&family=Vazirmatn:wght@400;500;600;700&display=swap');
+
+:root {
+  --font-ui: 'DM Sans', 'Vazirmatn', sans-serif;
+  --font-display: 'Playfair Display', 'DM Sans', serif;
+  font-family: var(--font-ui);
+  color: #0e1824;
+  background: #fff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Core palette */
+  --ink: #0e1824;
+  --ink-2: #2c3a4d;
+  --muted: #6a7585;
+  --line: #e8ecf0;
+  --line-2: #f0f3f6;
+  --blue: #2355f5;
+  --blue-dark: #1740d4;
+  --blue-light: #eef1ff;
+  --navy: #07102a;
+  --paper: #fff;
+  --paper-2: #f8fafc;
+  --gold: #c9972a;
+  --success: #22863a;
+  --success-bg: #edfaf0;
+  --error: #c0392b;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(14,24,40,.07), 0 1px 2px rgba(14,24,40,.05);
+  --shadow-md: 0 4px 16px rgba(14,24,40,.09), 0 1px 4px rgba(14,24,40,.06);
+  --shadow-lg: 0 12px 40px rgba(14,24,40,.14), 0 2px 8px rgba(14,24,40,.07);
+  --shadow-xl: 0 25px 80px rgba(14,24,40,.2), 0 4px 16px rgba(14,24,40,.1);
+}
+
+html[lang="ckb"] { --font-ui: 'Vazirmatn', 'DM Sans', sans-serif; }
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 100px; }
+body { min-width: 320px; margin: 0; }
+body, button, a { font-family: var(--font-ui); }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { color: inherit; }
+a { color: inherit; }
+::selection { color: #fff; background: var(--blue); }
+img { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Skip link for accessibility */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #000;
+  color: #fff;
+  padding: 8px 12px;
+  z-index: 100;
+  transition: top 0.3s ease-in-out;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 0 0 4px 4px;
+}
+.skip-link:focus {
+  top: 0;
+}

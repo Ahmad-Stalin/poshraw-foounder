@@ -1,0 +1,21 @@
+{
+  "id": "/",
+  "name": "POSHRAW.Co School Uniforms",
+  "short_name": "POSHRAW.Co",
+  "description": "School uniforms for every stage of learning in Sulaymaniyah.",
+  "lang": "ckb",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0a1128",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+.git
+.github
+.kilo
+data
+dist
+node_modules
+backups
+secrets
+.kilo
+tests
+docs
+npm-debug.log*
