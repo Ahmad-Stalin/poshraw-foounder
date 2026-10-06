@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Archive, BarChart3, Box, ImagePlus, LogOut, PackageCheck, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from 'lucide-react'
+import { ArrowLeft, Archive, BarChart3, Box, ImagePlus, LogOut, PackageCheck, Plus, RefreshCw, Save, ShieldCheck } from 'lucide-react'
 import './Admin.css'
 
 const orderStatusOptions = ['pending', 'confirmed', 'processing', 'ready', 'shipped', 'completed', 'cancelled']
@@ -865,19 +865,7 @@ function AdminApp() {
     setSetup({ setupRequired: false, setupEnabled: false })
   }
 
-  async function handleCreateProduct(credentials) {
-    setDataError('')
-    try {
-      await api('/api/admin/products', { method: 'POST', body: credentials })
-      setCreatingProduct(false)
-      setSelectedProductId(products[0]?.id || '')
-      refreshData()
-    } catch (error) {
-      setDataError(error.message)
-    }
-  }
-
-  async function handleLogout() {
+   async function handleLogout() {
     await api('/api/admin/logout', { method: 'POST', body: {} })
     setAdmin(null)
     setProducts([])
