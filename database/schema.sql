@@ -183,7 +183,7 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_id uuid REFERENCES customers(id) ON DELETE SET NULL,
     source text NOT NULL DEFAULT 'website' CHECK (source IN ('website', 'whatsapp', 'instagram', 'phone', 'store')),
     fulfillment_method text NOT NULL DEFAULT 'pickup' CHECK (fulfillment_method IN ('pickup', 'delivery')),
-    status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'processing', 'ready', 'completed', 'cancelled')),
+    status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'processing', 'ready', 'shipped', 'completed', 'cancelled')),
     payment_status text NOT NULL DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'pending', 'partially_paid', 'paid', 'partially_refunded', 'refunded')),
     currency char(3) NOT NULL DEFAULT 'IQD' CHECK (currency ~ '^[A-Z]{3}$'),
     subtotal_minor bigint CHECK (subtotal_minor IS NULL OR subtotal_minor >= 0),
@@ -211,8 +211,12 @@ ALTER TABLE orders ADD CONSTRAINT orders_payment_status_check
     CHECK (payment_status IN ('unpaid', 'pending', 'partially_paid', 'paid', 'partially_refunded', 'refunded'));
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS privacy_consent_at timestamptz;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS privacy_notice_version text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS whatsapp_updates_consent_at timestamptz;
 ALTER TABLE orders ALTER COLUMN delivery_minor DROP NOT NULL;
 ALTER TABLE orders ALTER COLUMN delivery_minor DROP DEFAULT;
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check
+    CHECK (status IN ('pending', 'confirmed', 'processing', 'ready', 'shipped', 'completed', 'cancelled'));
 
 CREATE TABLE IF NOT EXISTS order_items (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -233,8 +237,8 @@ CREATE TABLE IF NOT EXISTS order_status_events (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     actor_admin_id uuid REFERENCES admin_users(id) ON DELETE SET NULL,
-    previous_status text CHECK (previous_status IS NULL OR previous_status IN ('pending', 'confirmed', 'processing', 'ready', 'completed', 'cancelled')),
-    new_status text NOT NULL CHECK (new_status IN ('pending', 'confirmed', 'processing', 'ready', 'completed', 'cancelled')),
+    previous_status text CHECK (previous_status IS NULL OR previous_status IN ('pending', 'confirmed', 'processing', 'ready', 'shipped', 'completed', 'cancelled')),
+    new_status text NOT NULL CHECK (new_status IN ('pending', 'confirmed', 'processing', 'ready', 'shipped', 'completed', 'cancelled')),
     actor_type text NOT NULL DEFAULT 'system' CHECK (actor_type IN ('system', 'staff', 'customer')),
     note text,
     created_at timestamptz NOT NULL DEFAULT now()
@@ -242,14 +246,21 @@ CREATE TABLE IF NOT EXISTS order_status_events (
 
 ALTER TABLE order_status_events
     ADD COLUMN IF NOT EXISTS actor_admin_id uuid REFERENCES admin_users(id) ON DELETE SET NULL;
+ALTER TABLE order_status_events DROP CONSTRAINT IF EXISTS order_status_events_previous_status_check;
+ALTER TABLE order_status_events ADD CONSTRAINT order_status_events_previous_status_check
+    CHECK (previous_status IS NULL OR previous_status IN ('pending', 'confirmed', 'processing', 'ready', 'shipped', 'completed', 'cancelled'));
+ALTER TABLE order_status_events DROP CONSTRAINT IF EXISTS order_status_events_new_status_check;
+ALTER TABLE order_status_events ADD CONSTRAINT order_status_events_new_status_check
+    CHECK (new_status IN ('pending', 'confirmed', 'processing', 'ready', 'shipped', 'completed', 'cancelled'));
 
 CREATE TABLE IF NOT EXISTS email_notification_outbox (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    status_event_id uuid NOT NULL UNIQUE REFERENCES order_status_events(id) ON DELETE CASCADE,
+    status_event_id uuid UNIQUE REFERENCES order_status_events(id) ON DELETE CASCADE,
     order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     recipient_email text NOT NULL,
     locale text NOT NULL CHECK (locale IN ('en', 'ckb')),
-    notification_type text NOT NULL CHECK (notification_type IN ('order_received', 'order_status')),
+    notification_type text NOT NULL CHECK (notification_type IN ('order_received', 'order_status', 'refund')),
+    idempotency_key text,
     payload jsonb NOT NULL,
     status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
     attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
@@ -259,9 +270,34 @@ CREATE TABLE IF NOT EXISTS email_notification_outbox (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE email_notification_outbox ALTER COLUMN status_event_id DROP NOT NULL;
+ALTER TABLE email_notification_outbox DROP CONSTRAINT IF EXISTS email_notification_outbox_notification_type_check;
+ALTER TABLE email_notification_outbox ADD CONSTRAINT email_notification_outbox_notification_type_check
+    CHECK (notification_type IN ('order_received', 'order_status', 'refund'));
+ALTER TABLE email_notification_outbox ADD COLUMN IF NOT EXISTS idempotency_key text;
+CREATE UNIQUE INDEX IF NOT EXISTS email_notification_outbox_idempotency_idx
+    ON email_notification_outbox(idempotency_key);
+
 ALTER TABLE email_notification_outbox
     ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'sent', 'failed'));
+
+CREATE TABLE IF NOT EXISTS whatsapp_notification_outbox (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    status_event_id uuid UNIQUE REFERENCES order_status_events(id) ON DELETE CASCADE,
+    order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    recipient_phone text NOT NULL,
+    locale text NOT NULL CHECK (locale IN ('en', 'ckb')),
+    notification_type text NOT NULL CHECK (notification_type IN ('order_received', 'order_status', 'refund')),
+    idempotency_key text NOT NULL UNIQUE,
+    payload jsonb NOT NULL,
+    status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    next_attempt_at timestamptz NOT NULL DEFAULT now(),
+    sent_at timestamptz,
+    last_error text,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS payments (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -429,6 +465,7 @@ CREATE INDEX IF NOT EXISTS order_items_order_idx ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS accounting_entries_occurred_idx ON accounting_entries(occurred_at DESC);
 CREATE INDEX IF NOT EXISTS accounting_entries_method_occurred_idx ON accounting_entries(payment_method, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS email_notification_outbox_pending_idx ON email_notification_outbox(next_attempt_at, created_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS whatsapp_notification_outbox_pending_idx ON whatsapp_notification_outbox(next_attempt_at, created_at) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS site_page_views_created_idx ON site_page_views(created_at DESC);
 CREATE INDEX IF NOT EXISTS inventory_variant_created_idx ON inventory_movements(variant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS api_rate_limit_windows_reset_idx ON api_rate_limit_windows(reset_at);

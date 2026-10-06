@@ -57,6 +57,7 @@ test('customer order records consent, delivery quote and item snapshots, then re
       fulfillmentMethod: 'delivery',
       deliveryAddress: 'Test address, Sulaymaniyah',
       privacyAccepted: true,
+      whatsappUpdatesAccepted: true,
       items: [{ variantId, quantity: 3 }],
     }
 
@@ -73,8 +74,9 @@ test('customer order records consent, delivery quote and item snapshots, then re
     assert.equal(order.totalConfirmed, false)
 
     const orderRow = await database.query('SELECT * FROM orders WHERE id = $1', [order.id])
-    assert.equal(orderRow.rows[0].privacy_notice_version, '2026-10-04-v2')
+    assert.equal(orderRow.rows[0].privacy_notice_version, '2026-10-05-v3')
     assert.ok(orderRow.rows[0].privacy_consent_at)
+    assert.ok(orderRow.rows[0].whatsapp_updates_consent_at)
     assert.equal(orderRow.rows[0].customer_phone_snapshot, baseOrder.phone)
     assert.equal(orderRow.rows[0].delivery_address_snapshot.address, baseOrder.deliveryAddress)
     const receivedEmail = await database.query(
@@ -86,6 +88,15 @@ test('customer order records consent, delivery quote and item snapshots, then re
     assert.equal(receivedEmail.rows[0].notification_type, 'order_received')
     assert.equal(receivedEmail.rows[0].recipient_email, baseOrder.email)
     assert.equal(receivedEmail.rows[0].payload.orderNumber, order.orderNumber)
+    const receivedWhatsApp = await database.query(
+      `SELECT notification_type, recipient_phone, payload
+       FROM whatsapp_notification_outbox WHERE order_id = $1`,
+      [order.id],
+    )
+    assert.equal(receivedWhatsApp.rows.length, 1)
+    assert.equal(receivedWhatsApp.rows[0].notification_type, 'order_received')
+    assert.equal(receivedWhatsApp.rows[0].recipient_phone, '9647701234567')
+    assert.equal(receivedWhatsApp.rows[0].payload.orderNumber, order.orderNumber)
 
     const itemRow = await database.query('SELECT quantity, unit_price_minor, line_total_minor FROM order_items WHERE order_id = $1', [order.id])
     assert.equal(itemRow.rows[0].quantity, 3)
@@ -100,6 +111,7 @@ test('customer order records consent, delivery quote and item snapshots, then re
       body: {
         ...baseOrder,
         email: '',
+        whatsappUpdatesAccepted: false,
         fulfillmentMethod: 'pickup',
         deliveryAddress: '',
         items: [{ variantId, quantity: 1 }],
@@ -117,6 +129,11 @@ test('customer order records consent, delivery quote and item snapshots, then re
       [pickupOrder.id],
     )
     assert.equal(optionalEmail.rows[0].count, 0)
+    const noWhatsAppOptIn = await database.query(
+      'SELECT count(*)::int AS count FROM whatsapp_notification_outbox WHERE order_id = $1',
+      [pickupOrder.id],
+    )
+    assert.equal(noWhatsAppOptIn.rows[0].count, 0)
 
     const outOfStock = await request('/api/orders', {
       method: 'POST',
@@ -154,6 +171,14 @@ test('customer order records consent, delivery quote and item snapshots, then re
     )
     assert.deepEqual(statusEmail.rows.map((row) => row.notification_type), ['order_received', 'order_status'])
     assert.equal(statusEmail.rows[1].payload.status, 'cancelled')
+    const statusWhatsApp = await database.query(
+      `SELECT notification_type, payload
+       FROM whatsapp_notification_outbox WHERE order_id = $1
+       ORDER BY created_at`,
+      [order.id],
+    )
+    assert.deepEqual(statusWhatsApp.rows.map((row) => row.notification_type), ['order_received', 'order_status'])
+    assert.equal(statusWhatsApp.rows[1].payload.status, 'cancelled')
 
     const pageView = await request('/api/analytics/page-view', {
       method: 'POST',

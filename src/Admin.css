@@ -387,6 +387,40 @@
   border-radius: 100px;
 }
 .table-save:not(:disabled):hover { background: #e4ecff; border-color: #b0c0f5; }
+
+.admin-danger-button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1.5px solid #fec8c8;
+  border-radius: 100px;
+  color: #b91c1c;
+  background: #fee2e2;
+  font-size: 11.5px;
+  font-weight: 600;
+  transition: background .2s, border-color .2s, transform .15s;
+}
+.admin-danger-button:hover { background: #fecaca; border-color: #f87171; }
+.admin-danger-button:disabled { opacity: .48; cursor: not-allowed; }
+
+.admin-variant-form {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1.5px dashed #e4e9f0;
+  border-radius: 10px;
+  background: #fafbfd;
+}
+.admin-variant-form .variant-sku-field { grid-column: 1 / -1; }
+.admin-variant-form select,
+.admin-variant-form input { min-height: 34px; font-size: 10.5px; }
+.admin-variant-form button { min-height: 34px; font-size: 10.5px; }
 .admin-feedback {
   margin: 0;
   padding: 12px 15px;

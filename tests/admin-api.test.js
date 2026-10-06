@@ -35,6 +35,21 @@ test('admin setup protects product, photo, inventory, and order updates', async 
   const partialOrderId = partialOrderResult.rows[0].id
   const repaymentOrderResult = await database.query('INSERT INTO orders DEFAULT VALUES RETURNING id')
   const repaymentOrderId = repaymentOrderResult.rows[0].id
+  const shippingOrderResult = await database.query(
+    `INSERT INTO orders (fulfillment_method) VALUES ('delivery') RETURNING id`,
+  )
+  const shippingOrderId = shippingOrderResult.rows[0].id
+  const notificationCustomer = await database.query(
+    `INSERT INTO customers (full_name, phone, email, preferred_locale)
+     VALUES ('Notification Customer', '+9647701234567', 'refunds@example.test', 'en') RETURNING id`,
+  )
+  await database.query(
+    `UPDATE orders
+     SET customer_id = $1, customer_phone_snapshot = '+9647701234567',
+         whatsapp_updates_consent_at = now()
+     WHERE id = $2`,
+    [notificationCustomer.rows[0].id, orderId],
+  )
   await database.query(
     'UPDATE orders SET subtotal_minor = 125000, delivery_minor = 0, total_minor = 125000 WHERE id = $1',
     [orderId],
@@ -75,7 +90,7 @@ test('admin setup protects product, photo, inventory, and order updates', async 
     const instance = app.listen(0, '127.0.0.1', () => resolve(instance))
   })
   const baseUrl = `http://127.0.0.1:${server.address().port}`
-  const origin = 'http://localhost:5173'
+  const origin = 'http://localhost:5174'
   const request = (path, { method = 'GET', body, cookie, requestOrigin = origin } = {}) => fetch(`${baseUrl}${path}`, {
     method,
     headers: {
@@ -108,6 +123,24 @@ test('admin setup protects product, photo, inventory, and order updates', async 
     assert.equal(setupBody.admin.email, 'owner@example.com')
     const cookie = setupResponse.headers.get('set-cookie')?.split(';')[0]
     assert.ok(cookie)
+
+    assert.equal((await request(`/api/admin/orders/${orderId}/status`, {
+      method: 'PATCH',
+      cookie,
+      body: { status: 'shipped' },
+    })).status, 409)
+    assert.equal((await request(`/api/admin/orders/${shippingOrderId}/status`, {
+      method: 'PATCH',
+      cookie,
+      body: { status: 'processing' },
+    })).status, 200)
+    assert.equal((await request(`/api/admin/orders/${shippingOrderId}/status`, {
+      method: 'PATCH',
+      cookie,
+      body: { status: 'shipped' },
+    })).status, 200)
+    const shippedOrder = await database.query('SELECT status FROM orders WHERE id = $1', [shippingOrderId])
+    assert.equal(shippedOrder.rows[0].status, 'shipped')
 
     const today = new Date().toISOString().slice(0, 10)
     const paymentResponse = await request(`/api/admin/orders/${orderId}/payment`, {
@@ -222,6 +255,24 @@ test('admin setup protects product, photo, inventory, and order updates', async 
     })
     assert.equal(refundResponse.status, 201)
     assert.equal((await refundResponse.json()).refund.paymentStatus, 'refunded')
+    const refundEmail = await database.query(
+      `SELECT notification_type, recipient_email, payload
+       FROM email_notification_outbox WHERE order_id = $1`,
+      [orderId],
+    )
+    assert.equal(refundEmail.rows.length, 1)
+    assert.equal(refundEmail.rows[0].notification_type, 'refund')
+    assert.equal(refundEmail.rows[0].recipient_email, 'refunds@example.test')
+    assert.match(refundEmail.rows[0].payload.amount, /125,000/)
+    const refundWhatsApp = await database.query(
+      `SELECT notification_type, recipient_phone, payload
+       FROM whatsapp_notification_outbox WHERE order_id = $1`,
+      [orderId],
+    )
+    assert.equal(refundWhatsApp.rows.length, 1)
+    assert.equal(refundWhatsApp.rows[0].notification_type, 'refund')
+    assert.equal(refundWhatsApp.rows[0].recipient_phone, '9647701234567')
+    assert.equal(refundWhatsApp.rows[0].payload.paymentStatus, 'refunded')
     assert.equal((await request(`/api/admin/orders/${orderId}/refund`, {
       method: 'POST',
       cookie,

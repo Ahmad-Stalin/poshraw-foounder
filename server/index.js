@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { registerAdminRoutes } from './admin.js'
 import { registerAnalyticsRoutes } from './analytics.js'
 import { createEmailNotificationWorker, createEmailTransport } from './email-notifications.js'
+import { createWhatsAppNotificationWorker, createWhatsAppTransport } from './whatsapp-notifications.js'
 import {
   isMetricsAuthorizationValid,
   metricsContentType,
@@ -58,6 +59,7 @@ app.use((request, response, next) => {
 let database
 let httpServer
 let emailNotificationWorker
+let whatsappNotificationWorker
 
 registerAdminRoutes(app, {
   getDatabase: () => database,
@@ -115,7 +117,12 @@ app.post(
   (request, response) => {
     const origin = request.get('origin')
     const trustedOrigin = allowedOrigins.includes(origin)
-      || (!isProduction && ['http://localhost:5173', 'http://127.0.0.1:5173'].includes(origin))
+      || (!isProduction && [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'http://localhost:5174',
+        'http://127.0.0.1:5174',
+      ].includes(origin))
     if (!trustedOrigin) {
       recordClientErrorRejection('forbidden')
       response.status(403).json({ error: 'Request origin is not allowed' })
@@ -130,23 +137,35 @@ app.post(
 )
 
 app.get('/api/health/notifications', async (_request, response) => {
-  if (!emailNotificationWorker?.configured) {
+  if (!emailNotificationWorker?.configured && !whatsappNotificationWorker?.configured) {
     response.json({ status: 'disabled' })
     return
   }
   try {
-    const result = await database.query(
-      `SELECT
-         count(*) FILTER (WHERE status = 'pending' AND created_at < now() - interval '15 minutes')::int AS delayed,
-         count(*) FILTER (WHERE status = 'failed' AND created_at >= now() - interval '24 hours')::int AS failed
-       FROM email_notification_outbox`,
-    )
-    const { delayed, failed } = result.rows[0]
-    if (delayed > 0 || failed > 0) {
-      response.status(503).json({ error: 'Notification delivery is delayed' })
+    const channels = {}
+    if (emailNotificationWorker.configured) {
+      const result = await database.query(
+        `SELECT
+           count(*) FILTER (WHERE status = 'pending' AND created_at < now() - interval '15 minutes')::int AS delayed,
+           count(*) FILTER (WHERE status = 'failed' AND created_at >= now() - interval '24 hours')::int AS failed
+         FROM email_notification_outbox`,
+      )
+      channels.email = result.rows[0]
+    }
+    if (whatsappNotificationWorker.configured) {
+      const result = await database.query(
+        `SELECT
+           count(*) FILTER (WHERE status = 'pending' AND created_at < now() - interval '15 minutes')::int AS delayed,
+           count(*) FILTER (WHERE status = 'failed' AND created_at >= now() - interval '24 hours')::int AS failed
+         FROM whatsapp_notification_outbox`,
+      )
+      channels.whatsapp = result.rows[0]
+    }
+    if (Object.values(channels).some(({ delayed, failed }) => delayed > 0 || failed > 0)) {
+      response.status(503).json({ error: 'Notification delivery is delayed', channels })
       return
     }
-    response.json({ status: 'ok' })
+    response.json({ status: 'ok', channels })
   } catch (error) {
     reportServerError(error, 'health.notifications')
     response.status(503).json({ error: 'Notification status unavailable' })
@@ -361,6 +380,7 @@ async function start() {
 
   console.log(`Prometheus metrics: ${metricsBearerToken ? 'enabled at /internal/metrics' : 'disabled; set METRICS_BEARER_TOKEN to enable'}`)
   const emailTransport = createEmailTransport()
+  const whatsappTransport = createWhatsAppTransport()
 
   if (databaseUrl) {
     const connectionUrl = new URL(databaseUrl)
@@ -417,6 +437,10 @@ async function start() {
     else await database.query(seedSql)
   }
 
+  const catalogImageSyncSql = await readFile(path.join(projectRoot, 'database', 'sync-catalog-images.sql'), 'utf8')
+  if (database.exec) await database.exec(catalogImageSyncSql)
+  else await database.query(catalogImageSyncSql)
+
   if (isProduction) {
     const admins = await database.query('SELECT count(*)::int AS count FROM admin_users')
     if (admins.rows[0].count === 0 && !adminSetupToken) {
@@ -429,10 +453,20 @@ async function start() {
     transport: emailTransport,
   })
   emailNotificationWorker.start()
+  whatsappNotificationWorker = createWhatsAppNotificationWorker({
+    getDatabase: () => database,
+    transport: whatsappTransport,
+  })
+  whatsappNotificationWorker.start()
   if (!emailNotificationWorker.configured) {
     console.log('Order email notifications: queued until SMTP_HOST and SMTP_FROM are configured')
   } else {
     console.log('Order email notifications: enabled')
+  }
+  if (!whatsappNotificationWorker.configured) {
+    console.log('WhatsApp order notifications: queued until WhatsApp Cloud API is configured')
+  } else {
+    console.log('WhatsApp order notifications: enabled')
   }
 
   httpServer = app.listen(port, host, () => {
@@ -446,6 +480,7 @@ async function start() {
 async function stop() {
   if (httpServer) await new Promise((resolve) => httpServer.close(resolve))
   if (emailNotificationWorker) await emailNotificationWorker.stop()
+  if (whatsappNotificationWorker) await whatsappNotificationWorker.stop()
   if (database) await database.close()
   process.exit(0)
 }

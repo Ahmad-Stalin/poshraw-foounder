@@ -26,6 +26,7 @@ The sample seed is safe to rerun. It creates 12 demo catalog products, 24 Englis
 - `GET /api/catalog?locale=ckb` returns Sorani labels; use `locale=en` for English.
 - `POST /api/orders` records customer contact/consent, pickup or delivery choice, item snapshots, and server-calculated totals. It accepts `items: [{ variantId, quantity }]`; client-supplied prices are never trusted.
 - The catalog response includes stages, active colors, sizes, translated products, card images, and each active product variant with its SKU, effective price, inventory tracking flag, and stock count.
+- Customers choose a size but not a color in the storefront. For the chosen size, the order uses the first in-stock color in the catalog's color order; the assigned color is displayed before order submission.
 - Unpriced variants return `priceMinor: null`. Untracked stock returns `stockOnHand: null` and `trackInventory: false`.
 - Orders with unconfigured product prices or unconfirmed delivery fees are saved with nullable totals for staff confirmation. Tracked inventory is reserved in the same transaction; cancellation releases remaining reservations.
 - In development, Vite proxies `/api` to Express on port 3001. In production, run `npm run build` followed by `npm start`.
@@ -98,7 +99,8 @@ erDiagram
 - `customers`, `customer_addresses`: reusable customer/contact records and delivery addresses. Order address/contact snapshots preserve what was submitted at checkout.
 - `admin_users`, `admin_sessions`: scrypt password hashes and expiring, revocable admin sessions. Raw session tokens are only sent in HTTP-only cookies; the database stores their SHA-256 hashes.
 - `orders`, `order_items`: order lifecycle and immutable product/variant/name/price snapshots, so later catalog edits do not rewrite past orders.
-- `order_status_events`: audit trail for every order status transition.
+- `order_status_events`: audit trail for every order status transition, including shipped delivery orders.
+- `email_notification_outbox`, `whatsapp_notification_outbox`: transactional, retryable customer messages; WhatsApp is queued only when per-order consent was recorded.
 - `payments`: provider transaction references and idempotency keys, ready for a payment provider when one is selected.
 - `store_locations`, `store_hours`, `store_social_links`: store address, verified operating hours, and contact/social links. Phone, WhatsApp number, and hours remain unset until confirmed.
 
@@ -106,4 +108,4 @@ erDiagram
 
 Create an order and its items in one transaction. When inventory tracking is enabled, lock each selected variant with `SELECT ... FOR UPDATE`, check stock, insert the order items and inventory movement, and update `stock_on_hand` before committing. Use a unique payment idempotency key to avoid duplicate payment records. Keep database credentials on the server; never expose them in Vite client variables.
 
-The storefront reads its catalog and submits order requests through the API. The admin dashboard can adjust catalog/inventory records and update order status. Payment capture and automated email/WhatsApp notifications are not implemented; the store must confirm quote orders and payment directly with the customer.
+The storefront reads its catalog and submits order requests through the API. The admin dashboard can adjust catalog/inventory records and update order status. Email and consent-based WhatsApp notifications cover order receipt, order-status changes, and refunds; WhatsApp uses approved Meta Cloud API templates. Delivery orders can be marked shipped, while pickup orders can be marked ready. Payment gateway capture is not implemented; staff record cash or bank-transfer payments, and the store must confirm quote orders and payment directly with the customer.

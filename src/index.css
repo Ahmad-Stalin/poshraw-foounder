@@ -37,6 +37,30 @@
 
 html[lang="ckb"] { --font-ui: 'Vazirmatn', 'DM Sans', sans-serif; }
 
+body:has(.site-header) {
+  --ink: #0e1824;
+  --ink-2: #2c3a4d;
+  --muted: #6a7585;
+  --line: #e8ecf0;
+  --line-2: #f0f3f6;
+  --blue: #2355f5;
+  --blue-dark: #1740d4;
+  --blue-light: #eef1ff;
+  --navy: #07102a;
+  --paper: #fff;
+  --paper-2: #f8fafc;
+  --gold: #c9972a;
+  --success: #22863a;
+  --success-bg: #edfaf0;
+  --error: #c0392b;
+  --shadow-sm: 0 1px 3px rgba(14,24,40,.07), 0 1px 2px rgba(14,24,40,.05);
+  --shadow-md: 0 4px 16px rgba(14,24,40,.09), 0 1px 4px rgba(14,24,40,.06);
+  --shadow-lg: 0 12px 40px rgba(14,24,40,.14), 0 2px 8px rgba(14,24,40,.07);
+  --shadow-xl: 0 25px 80px rgba(14,24,40,.2), 0 4px 16px rgba(14,24,40,.1);
+  background: var(--paper);
+  color: var(--ink);
+}
+
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 100px; }
 body { min-width: 320px; margin: 0; }

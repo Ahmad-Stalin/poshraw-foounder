@@ -12,6 +12,7 @@ const statusLabels = {
     confirmed: 'Confirmed',
     processing: 'Being prepared',
     ready: 'Ready',
+    shipped: 'Shipped',
     completed: 'Completed',
     cancelled: 'Cancelled',
   },
@@ -20,6 +21,7 @@ const statusLabels = {
     confirmed: 'پشتڕاست کرایەوە',
     processing: 'ئامادە دەکرێت',
     ready: 'ئامادەیە',
+    shipped: 'نێردراوە',
     completed: 'تەواو بوو',
     cancelled: 'هەڵوەشایەوە',
   },
@@ -40,11 +42,19 @@ export function renderOrderNotification(notification) {
   const isSorani = locale === 'ckb'
   const orderNumber = String(notification.payload.orderNumber)
   const status = statusLabels[locale][notification.payload.status] || notification.payload.status
+  const isRefund = notification.notification_type === 'refund'
+  const fulfillmentMethod = notification.payload.fulfillmentMethod
+  const readyStatus = locale === 'ckb'
+    ? fulfillmentMethod === 'pickup' ? 'ئامادەی وەرگرتنە' : 'ئامادەی گەیاندنە'
+    : fulfillmentMethod === 'pickup' ? 'Ready for pickup' : 'Ready for delivery'
+  const displayedStatus = notification.payload.status === 'ready' ? readyStatus : status
   const subject = isSorani
-    ? `نوێکاریی داواکاری ${orderNumber}`
-    : `${notification.notification_type === 'order_received' ? 'Order received' : 'Order update'} ${orderNumber}`
+    ? `${isRefund ? 'گەڕاندنەوەی پارە' : 'نوێکاریی داواکاری'} ${orderNumber}`
+    : `${notification.notification_type === 'order_received' ? 'Order received' : isRefund ? 'Refund update' : 'Order update'} ${orderNumber}`
   const heading = notification.notification_type === 'order_received'
     ? isSorani ? 'سوپاس بۆ داواکارییەکەت' : 'Thank you for your order'
+    : isRefund
+      ? isSorani ? 'گەڕاندنەوەی پارە تۆمار کرا' : 'Your refund has been recorded'
     : isSorani ? 'داواکارییەکەت نوێکرایەوە' : 'Your order has been updated'
   const lines = (notification.payload.items || []).map((item) => (
     `${item.name} · ${item.color} · ${item.size} × ${item.quantity}`
@@ -52,13 +62,21 @@ export function renderOrderNotification(notification) {
   const text = [
     heading,
     `${isSorani ? 'ژمارەی داواکاری' : 'Order number'}: ${orderNumber}`,
-    `${isSorani ? 'بارودۆخ' : 'Status'}: ${status}`,
+    ...(isRefund
+      ? [`${isSorani ? 'بڕی گەڕاندنەوە' : 'Refund amount'}: ${notification.payload.amount}`]
+      : [`${isSorani ? 'بارودۆخ' : 'Status'}: ${displayedStatus}`]),
     ...lines,
     isSorani
       ? 'فرۆشگا پێش جێبەجێکردنی داواکاری پەیوەندیت پێوە دەکات.'
-      : 'The store will contact you to confirm your order.',
+      : isRefund ? 'Contact the store if you have questions about this refund.' : 'The store will contact you to confirm your order.',
   ].join('\n')
-  const html = `<main lang="${locale}" dir="${isSorani ? 'rtl' : 'ltr'}"><h1>${escapeHtml(heading)}</h1><p>${escapeHtml(isSorani ? 'ژمارەی داواکاری' : 'Order number')}: <strong>${escapeHtml(orderNumber)}</strong></p><p>${escapeHtml(isSorani ? 'بارودۆخ' : 'Status')}: ${escapeHtml(status)}</p>${lines.length ? `<ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>` : ''}<p>${escapeHtml(isSorani ? 'فرۆشگا پێش جێبەجێکردنی داواکاری پەیوەندیت پێوە دەکات.' : 'The store will contact you to confirm your order.')}</p></main>`
+  const details = isRefund
+      ? `<p>${escapeHtml(isSorani ? 'بڕی گەڕاندنەوە' : 'Refund amount')}: ${escapeHtml(notification.payload.amount)} ${escapeHtml(notification.payload.currency)}</p>`
+      : `<p>${escapeHtml(isSorani ? 'بارودۆخ' : 'Status')}: ${escapeHtml(displayedStatus)}</p>`
+  const footer = isRefund
+      ? isSorani ? 'ئەگەر پرسیارت هەیە، پەیوەندی بە فرۆشگا بکە.' : 'Contact the store if you have questions about this refund.'
+      : isSorani ? 'فرۆشگا پێش جێبەجێکردنی داواکاری پەیوەندیت پێوە دەکات.' : 'The store will contact you to confirm your order.'
+  const html = `<main lang="${locale}" dir="${isSorani ? 'rtl' : 'ltr'}"><h1>${escapeHtml(heading)}</h1><p>${escapeHtml(isSorani ? 'ژمارەی داواکاری' : 'Order number')}: <strong>${escapeHtml(orderNumber)}</strong></p>${details}${lines.length ? `<ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>` : ''}<p>${escapeHtml(footer)}</p></main>`
 
   return { subject, text, html }
 }
@@ -95,18 +113,21 @@ export function createEmailTransport(environment = process.env) {
 
 export async function queueOrderEmail(transaction, {
   orderId,
-  statusEventId,
+  statusEventId = null,
   recipientEmail,
   locale,
   notificationType,
   payload,
+  idempotencyKey = statusEventId ? `status:${statusEventId}` : null,
 }) {
   if (!recipientEmail) return
+  if (!idempotencyKey) throw new Error('An email notification idempotency key is required.')
   await transaction.query(
     `INSERT INTO email_notification_outbox
-       (status_event_id, order_id, recipient_email, locale, notification_type, payload)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
-    [statusEventId, orderId, recipientEmail, locale, notificationType, JSON.stringify(payload)],
+       (status_event_id, order_id, recipient_email, locale, notification_type, idempotency_key, payload)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+     ON CONFLICT (idempotency_key) DO NOTHING`,
+    [statusEventId, orderId, recipientEmail, locale, notificationType, idempotencyKey, JSON.stringify(payload)],
   )
 }
 

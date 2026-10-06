@@ -10,15 +10,21 @@ Open `http://localhost:5173/admin` to create the first owner account or sign in.
 
 The local `.env` file is ignored by Git. Never commit production credentials.
 
-## Order email notifications
+## Order notifications
 
-Customers can optionally provide an email address when placing an order. The application queues an order confirmation and subsequent status updates transactionally. A background worker sends messages using SMTP, retries temporary failures with backoff, and marks messages failed after eight attempts.
+Customers can optionally provide an email address when placing an order. Order confirmations, order status changes, and refund records are queued in the same database transaction as their order event. Background workers send messages and retry temporary failures with backoff, then mark messages failed after eight attempts.
 
-Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, and `SMTP_FROM` in the server environment. If the SMTP provider requires authentication, set both `SMTP_USER` and `SMTP_PASSWORD`. Without SMTP configuration, notifications remain queued and the server reports that email delivery is disabled. Use provider-issued SMTP credentials and test delivery before launch.
+Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, and `SMTP_FROM` in the server environment. If the SMTP provider requires authentication, set both `SMTP_USER` and `SMTP_PASSWORD`. Without SMTP configuration, email notifications remain queued.
+
+Customers may separately opt in at checkout to WhatsApp updates for that order. This consent is optional and distinct from the required order-processing privacy consent; it is recorded with the order and is not marketing consent. The app queues WhatsApp order confirmations, pickup/delivery status changes, shipped updates, and refund notices only when the customer opted in and supplied a valid international phone number. Abandoned carts are not collected or messaged.
+
+To enable WhatsApp delivery, configure `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, and `WHATSAPP_GRAPH_API_VERSION` with Meta WhatsApp Cloud API credentials, then set the approved template names and exact language codes for `WHATSAPP_TEMPLATE_ORDER_RECEIVED`, `WHATSAPP_TEMPLATE_ORDER_STATUS`, `WHATSAPP_TEMPLATE_REFUND`, `WHATSAPP_TEMPLATE_LOCALE_EN`, and `WHATSAPP_TEMPLATE_LOCALE_CKB`. Create approved utility templates with body parameters in this order: order received: order number; order status: order number, localized status; refund: order number, formatted refund amount, localized payment status. A configured template must match the locale code and parameter count. Keep the access token in the hosting secret manager, never in browser configuration. With WhatsApp unconfigured, opted-in messages remain queued; `/api/health/notifications` reports the configured channels' delivery health.
+
+Delivery orders may be moved to **Shipped** in the admin order status control. Pickup orders use **Ready** for pickup-ready notifications. These messages use Meta-approved templates, as WhatsApp business-initiated messages require approved templates outside the customer-service window.
 
 ## Analytics and privacy
 
-The admin dashboard's **Analytics** tab reports anonymous storefront page views, order requests, request-to-view ratio, and popular paths for the previous 30 days. It stores only page paths and timestamps, not IP addresses, cookies, or visitor identifiers. Order contact information is used to process requests; an email address is optional and is used only for order confirmations and status updates.
+The admin dashboard's **Analytics** tab reports anonymous storefront page views, order requests, request-to-view ratio, and popular paths for the previous 30 days. It stores only page paths and timestamps, not IP addresses, cookies, or visitor identifiers. Order contact information is used to process requests; email is optional and used for order and refund updates, while WhatsApp updates are sent only with separate opt-in consent.
 
 ## Monitoring and alerts
 
@@ -59,6 +65,7 @@ The repository includes a multi-stage `Dockerfile` for deployment behind a hosti
 - `TRUST_PROXY_HOPS` matching the number of trusted HTTPS proxy hops in front of the app.
 - A unique, randomly generated `POSHRAW_ADMIN_SETUP_TOKEN` of at least 32 bytes only if initial admin setup is still required. Remove it after setup.
 - The SMTP settings above if email notifications should be sent.
+- The Meta WhatsApp Cloud API credentials and approved template settings above if opted-in customers should receive WhatsApp updates.
 
 The production server refuses plain HTTP and local PGlite databases. The canonical storefront URL is `https://www.poshraw.com/`; `https://poshraw.com` should redirect to it. Both hostnames are allowed as storefront origins. The domain currently resolves and the apex redirects to `www`; verify both hostnames have valid, automatically renewed TLS certificates and keep that redirect at the hosting/DNS provider. Point DNS at the hosting target supplied by that provider.
 

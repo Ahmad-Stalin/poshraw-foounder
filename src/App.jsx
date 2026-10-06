@@ -8,7 +8,8 @@ const copy = {
     location: 'سلێمانی، خوار فلکەی خاڵە حاجی',
     contactLine: 'پەیوەندی: واتساپ',
     openingHours: 'کاتی کار',
-    openingHoursUnknown: 'کاتی کار پشتڕاست نەکراوەتەوە. پێش سەردان، لە واتساپ پەیوەندیمان پێوە بکەن.',
+    openingHoursUnknown: '٩:٠٠ی بەیانی تا ٥:٠٠ی ئێوارە',
+    heroSlideLabel: 'وێنەی سلایدی {number}',
     policies: 'گەیاندن و زانیارییەکان',
     policyEyebrow: 'زانیاریی داواکردن',
     policyTitle: 'پێش داواکردن، وردەکارییەکان بپرسە.',
@@ -18,11 +19,16 @@ const copy = {
     returnsTitle: 'گەڕاندنەوە و گۆڕین',
     returnsText: 'مەرجی گەڕاندنەوە و گۆڕین لەلایەن فرۆشگا پشتڕاست نەکراوەتەوە. پێش کڕین، لە واتساپ پرسیاری بکەن.',
     privacyTitle: 'پاراستنی نهێنی',
-    privacyText: 'بۆ جێبەجێکردنی داواکاری، ناو، ژمارەی تەلەفۆن، ئیمەیڵ (ئەگەر بنووسرێت)، ناونیشان (ئەگەر گەیاندن هەڵبژێردرێت) و وردەکاریی بەرهەمەکان تۆمار دەکرێن. ئیمەیڵ تەنها بۆ نوێکاریی داواکاری بەکاردێت. تەنها بەڕێوەبەرانی ڕێگەپێدراو دەستپێگەیشتنیان پێیان هەیە. ژمارەی سەردانی لاپەڕەکان بەبێ ناسنامەی کەسی تۆمار دەکرێت.',
+    privacyText: 'بۆ جێبەجێکردنی داواکاری، ناو، ژمارەی تەلەفۆن، ئیمەیڵ (ئەگەر بنووسرێت)، ناونیشان (ئەگەر گەیاندن هەڵبژێردرێت) و وردەکاریی بەرهەمەکان تۆمار دەکرێن. ئیمەیڵ تەنها بۆ نوێکاریی داواکاری بەکاردێت؛ نوێکاریی واتساپ تەنها ئەگەر ڕەزامەندی بدەیت نێردرێت. تەنها بەڕێوەبەرانی ڕێگەپێدراو دەستپێگەیشتنیان پێیان هەیە. ژمارەی سەردانی لاپەڕەکان بەبێ ناسنامەی کەسی تۆمار دەکرێت.',
     mapLabel: 'تەنیشت مۆبیلیاتی هەواڵ هۆم، سلێمانی',
     collection: 'کۆمەڵەی ساڵی ٢٠٢٦ – ٢٠٢٧',
     headline: <>ڕۆژێکی نوێ،<br />بە جلوبەرگێکی <em>باشتر.</em></>,
     intro: 'جلوبەرگی قوتابخانەیی بە کوالێتیی بەرز، بۆ هەموو قۆناغەکانی خوێندن.',
+    trustItems: [
+      { title: 'بۆ هەموو ڕۆژێکی خوێندن', detail: 'جلوبەرگێکی ئاسوودە و گونجاو' },
+      { title: 'قۆناغەکانی خوێندن', detail: 'هەڵبژاردە بۆ تەمەنی جیاواز' },
+      { title: 'لە سلێمانی', detail: 'پەیوەندیی ڕاستەوخۆ لەگەڵ فرۆشگا' },
+    ],
     browse: 'بینینی جلوبەرگەکان',
     whatsapp: 'داواکردن لە واتساپ',
     crafted: 'بە وردی بۆ هەر ڕۆژێکی قوتابخانە دروستکراوە',
@@ -46,7 +52,7 @@ const copy = {
     schoolStage: 'قۆناغی خوێندن',
     available: 'قەبارەکان',
     choose: 'قەبارە هەڵبژێرە',
-    color: 'ڕەنگ',
+    assignedColor: 'ڕەنگی دیاریکراوی فرۆشگا',
     size: 'قەبارە',
     close: 'داخستن',
     madeFor: 'بۆ ساڵێکی خوێندنی باشتر',
@@ -59,7 +65,6 @@ const copy = {
     adminLink: 'بەڕێوەبردنی فرۆشگا',
     footerLine: 'جلوبەرگی ئاسوودە بۆ هەر ڕۆژێکی قوتابخانە.',
     selected: 'هەڵبژێردراو',
-    chooseColor: 'ڕەنگێک هەڵبژێرە',
     cart: 'سەبەتە',
     orderFormTitle: 'داواکارییەکەت تەواو بکە',
     orderFormIntro: 'وردەکارییەکان بنووسە؛ فرۆشگا پێش پشتڕاستکردنەوەی داواکاری پەیوەندیت پێوە دەکات.',
@@ -82,6 +87,7 @@ const copy = {
     orderSubmitted: 'داواکارییەکەت تۆمار کرا.',
     orderNumber: 'ژمارەی داواکاری',
     privacyConsent: 'ڕازیم کە زانیارییەکانم بۆ جێبەجێکردنی ئەم داواکارییە تۆمار بکرێن.',
+    whatsappUpdatesConsent: 'ڕازیم بۆ ئەوەی پۆشراو لە واتساپ نوێکاریی داواکاری، ئامادەبوون، گەیاندن و گەڕاندنەوەی پارەم بۆ بنێرێت. پەیامی بازاڕگانی نانێردرێت. ژمارەکە بە شێوەی نێودەوڵەتی بنووسە، وەک +9647701234567.',
     emptyCart: 'سەبەتەکە بەتاڵە.',
     orderFailed: 'تۆمارکردنی داواکاری سەرکەوتوو نەبوو.',
   },
@@ -90,7 +96,8 @@ const copy = {
     location: 'Sulaymaniyah, Khala Haji circle',
     contactLine: 'Contact us on WhatsApp',
     openingHours: 'Opening hours',
-    openingHoursUnknown: 'Hours have not been confirmed. Message us on WhatsApp before visiting.',
+    openingHoursUnknown: '9:00 AM–5:00 PM',
+    heroSlideLabel: 'Go to slide {number}',
     policies: 'Delivery & policies',
     policyEyebrow: 'ORDER INFORMATION',
     policyTitle: 'A few details before you order.',
@@ -100,11 +107,16 @@ const copy = {
     returnsTitle: 'Returns & exchanges',
     returnsText: 'Return and exchange terms have not been confirmed by the store. Please ask on WhatsApp before purchase.',
     privacyTitle: 'Privacy',
-    privacyText: 'To process an order, this site stores your name, phone number, optional email address, delivery address (if provided), and order details. If provided, your email is used only for order confirmations and status updates. Authorized store admins can access order records. Anonymous page-view counts are collected without personal identifiers.',
+    privacyText: 'To process an order, this site stores your name, phone number, optional email address, delivery address (if provided), and order details. Email is used only for order updates; WhatsApp updates are sent only with your separate consent. Authorized store admins can access order records. Anonymous page-view counts are collected without personal identifiers.',
     mapLabel: 'Beside Hawal Home Furniture, Sulaymaniyah',
     collection: 'THE 2026 – 2027 COLLECTION',
     headline: <>A new day,<br />a <em>better fit.</em></>,
     intro: 'Thoughtfully made school uniforms, designed to keep up with every stage of growing.',
+    trustItems: [
+      { title: 'Made for everyday', detail: 'Comfortable fits for busy school days' },
+      { title: 'Every stage', detail: 'Options for growing students' },
+      { title: 'Based in Sulaymaniyah', detail: 'Speak directly with our local team' },
+    ],
     browse: 'Explore uniforms',
     whatsapp: 'Order on WhatsApp',
     crafted: 'Considered details for every school day',
@@ -131,7 +143,7 @@ const copy = {
     schoolStage: 'School stage',
     available: 'AVAILABLE SIZES',
     choose: 'Choose a size',
-    color: 'Color',
+    assignedColor: 'Store-selected color',
     size: 'Size',
     close: 'Close',
     madeFor: 'MADE FOR THE YEAR AHEAD',
@@ -144,7 +156,6 @@ const copy = {
     adminLink: 'Store admin',
     footerLine: 'A uniform that feels right, every day.',
     selected: 'Selected',
-    chooseColor: 'Choose a color',
     cart: 'Order bag',
     orderFormTitle: 'Complete your order',
     orderFormIntro: 'Share your details. The store will contact you to confirm the order.',
@@ -167,6 +178,7 @@ const copy = {
     orderSubmitted: 'Your order request is recorded.',
     orderNumber: 'Order number',
     privacyConsent: 'I agree that my details may be stored to process this order.',
+    whatsappUpdatesConsent: 'I agree to receive WhatsApp updates about this order, including confirmation, pickup or delivery status, and refunds. No marketing messages. Enter an international number such as +9647701234567.',
     emptyCart: 'Your order bag is empty.',
     orderFailed: 'Could not submit the order. Please try again or contact the store.',
   },
@@ -179,30 +191,43 @@ const colorPreviewFilters = {
   MAROON: 'sepia(.24) hue-rotate(292deg) saturate(.86)',
 }
 
+const heroSlides = [
+  {
+    src: '/images/poshraw/DSC09027.webp',
+    alt: 'School uniforms displayed inside the POSHRAW.Co store',
+    position: 'center 48%',
+  },
+  {
+    src: '/images/poshraw/DSC09005.webp',
+    alt: 'POSHRAW.Co showroom with school uniforms and folded clothing',
+    position: 'center 52%',
+  },
+  {
+    src: '/images/poshraw/DSC09010.webp',
+    alt: 'POSHRAW.Co storefront in Sulaymaniyah',
+    position: 'center 48%',
+  },
+]
+
 const whatsappPhone = '9647728223939'
 const whatsappUrl = (message) => `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`
 const mapUrl = 'https://www.google.com/maps/search/?api=1&query=Khwar+Flkay+Khala+Haji+next+to+Hawal+Home+Furniture+Sulaymaniyah'
 const mapEmbed = 'https://maps.google.com/maps?q=Hawal%20Home%20Furniture%2C%20Khwar%20Flkay%20Khala%20Haji%2C%20Sulaymaniyah&t=&z=16&ie=UTF8&iwloc=&output=embed'
 
-function getProductSelection(product, selectedColorCode, selectedSizeCode) {
+function getProductSelection(product, selectedSizeCode) {
   const variants = product.variants || []
   const availableVariants = variants.filter((variant) => variant.isAvailable)
-  const selectedColor = variants.find((variant) => variant.colorCode === selectedColorCode && variant.isAvailable)
+  const selectedVariant = availableVariants.find((variant) => variant.sizeCode === selectedSizeCode)
+    || availableVariants.find((variant) => variant.sizeCode === 'M')
     || availableVariants[0]
+    || variants.find((variant) => variant.sizeCode === selectedSizeCode)
     || variants[0]
-  const variantsForColor = selectedColor
-    ? variants.filter((variant) => variant.colorCode === selectedColor.colorCode)
-    : []
-  const selectedVariant = variantsForColor.find((variant) => variant.sizeCode === selectedSizeCode && variant.isAvailable)
-    || variantsForColor.find((variant) => variant.sizeCode === 'M' && variant.isAvailable)
-    || variantsForColor.find((variant) => variant.isAvailable)
-    || variantsForColor[0]
 
-  return { colorCode: selectedColor?.colorCode, variant: selectedVariant, variantsForColor }
+  return { variant: selectedVariant }
 }
 
-function getVariantGallery(product, selectedColorCode, selectedSizeCode) {
-  const selection = getProductSelection(product, selectedColorCode, selectedSizeCode)
+function getVariantGallery(product, selectedSizeCode) {
+  const selection = getProductSelection(product, selectedSizeCode)
   const selectedVariant = selection.variant
   const gallery = selectedVariant?.gallery?.length
     ? selectedVariant.gallery
@@ -261,6 +286,7 @@ function OrderFormModal({ cartLines, locale, language, text, onClose, onQuantity
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [note, setNote] = useState('')
   const [privacyAccepted, setPrivacyAccepted] = useState(false)
+  const [whatsappUpdatesAccepted, setWhatsappUpdatesAccepted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [submittedOrder, setSubmittedOrder] = useState(null)
@@ -291,6 +317,7 @@ function OrderFormModal({ cartLines, locale, language, text, onClose, onQuantity
           deliveryAddress,
           note,
           privacyAccepted: true,
+          whatsappUpdatesAccepted,
           items: cartLines.map((line) => ({ variantId: line.variant.id, quantity: line.quantity })),
         }),
       })
@@ -330,7 +357,7 @@ function OrderFormModal({ cartLines, locale, language, text, onClose, onQuantity
               {cartLines.map((line) => (
                 <div className="checkout-line" key={line.variant.id}>
                   <div className="checkout-line-heading"><strong>{line.product.name}</strong><button className="remove-line" type="button" onClick={() => onRemove(line.variant.id)}>{text.remove}</button></div>
-                  <span>{line.variant.colorName} · {line.variant.sizeLabel} · {formatPrice(line.variant.priceMinor, line.variant.currency, language) || text.priceInquiry}</span>
+                  <span>{text.assignedColor}: {line.variant.colorName} · {line.variant.sizeLabel} · {formatPrice(line.variant.priceMinor, line.variant.currency, language) || text.priceInquiry}</span>
                   <label className="quantity-field">{text.quantity}<input type="number" min="1" max="10" value={line.quantity} onChange={(event) => onQuantityChange(line.variant.id, Number(event.target.value))} required /></label>
                 </div>
               ))}
@@ -352,6 +379,7 @@ function OrderFormModal({ cartLines, locale, language, text, onClose, onQuantity
             </div>
 
             <label className="privacy-consent"><input type="checkbox" checked={privacyAccepted} onChange={(event) => setPrivacyAccepted(event.target.checked)} required /><span>{text.privacyConsent}</span></label>
+            <label className="privacy-consent"><input type="checkbox" checked={whatsappUpdatesAccepted} onChange={(event) => setWhatsappUpdatesAccepted(event.target.checked)} /><span>{text.whatsappUpdatesConsent}</span></label>
             {error && <p className="admin-error" role="alert">{error}</p>}
             <button className="button button-blue order-submit" type="submit" disabled={submitting || !privacyAccepted || cartLines.some((line) => !line.variant.isAvailable)}>{submitting ? text.submitting : text.submitOrder}<ArrowUpRight size={15} /></button>
           </form>
@@ -364,8 +392,10 @@ function OrderFormModal({ cartLines, locale, language, text, onClose, onQuantity
 function App() {
   const pageViewRecorded = useRef(false)
   const [language, setLanguage] = useState('ku')
+  const [heroSlide, setHeroSlide] = useState({ index: 0, previousIndex: null, direction: 1 })
+  const [heroPaused, setHeroPaused] = useState(false)
+  const heroIndex = heroSlide.index
   const [activeStage, setActiveStage] = useState('all')
-  const [selectedColors, setSelectedColors] = useState({})
   const [selectedSizes, setSelectedSizes] = useState({})
   const [selectedProductId, setSelectedProductId] = useState(null)
   const [quickView, setQuickView] = useState(null)
@@ -430,6 +460,20 @@ function App() {
   }, [language, text.direction])
 
   useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || heroPaused) return undefined
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        setHeroSlide((current) => ({
+          index: (current.index + 1) % heroSlides.length,
+          previousIndex: current.index,
+          direction: 1,
+        }))
+      }
+    }, 6500)
+    return () => window.clearInterval(interval)
+  }, [heroPaused])
+
+  useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
@@ -448,19 +492,19 @@ function App() {
     const closeOnEscape = (event) => event.key === 'Escape' && setQuickView(null)
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [quickView, selectedColors[quickView?.id], selectedSizes[quickView?.id]])
+  }, [quickView])
 
   const productName = (product) => product.name
   const detailProduct = selectedProductId ? catalog.products.find((product) => product.id === selectedProductId) : quickView
-  const detailSelection = detailProduct ? getProductSelection(detailProduct, selectedColors[detailProduct.id], selectedSizes[detailProduct.id]) : null
-  const detailGallery = detailProduct ? getVariantGallery(detailProduct, selectedColors[detailProduct.id], selectedSizes[detailProduct.id]) : []
+  const detailSelection = detailProduct ? getProductSelection(detailProduct, selectedSizes[detailProduct.id]) : null
+  const detailGallery = detailProduct ? getVariantGallery(detailProduct, selectedSizes[detailProduct.id]) : []
   const stageName = (stageCode) => {
     const stage = catalog.stages.find((item) => item.code === stageCode)
     if (!stage) return stageCode
     return language === 'ku' ? `قۆناغی ${stage.name}` : stage.name
   }
   const quickSelection = quickView
-    ? getProductSelection(quickView, selectedColors[quickView.id], selectedSizes[quickView.id])
+    ? getProductSelection(quickView, selectedSizes[quickView.id])
     : null
   const cartLines = cartItems.map((item) => {
     const product = catalog.products.find((entry) => entry.id === item.productId)
@@ -522,8 +566,34 @@ function App() {
 
       <main>
         <section className="hero-wrap" id="home">
-          <div className="hero">
-            <img className="hero-image" src="https://images.unsplash.com/photo-1612229693210-30e16029c415?auto=format&fit=crop&w=1900&q=85" alt="Schoolchildren wearing uniforms together" fetchPriority="high" />
+          <div
+            className="hero"
+            role="region"
+            aria-roledescription="carousel"
+            aria-label={language === 'ku' ? 'وێنەکانی پۆشراو' : 'POSHRAW.Co photos'}
+            onMouseEnter={() => setHeroPaused(true)}
+            onMouseLeave={() => setHeroPaused(false)}
+            onFocusCapture={() => setHeroPaused(true)}
+            onBlurCapture={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setHeroPaused(false)
+            }}
+          >
+            {heroSlides.map((slide, index) => (
+              <img
+                key={slide.src}
+                className={[
+                  'hero-image',
+                  'loaded',
+                  heroIndex === index ? `is-active slide-${heroSlide.direction > 0 ? 'forward' : 'backward'}` : '',
+                  heroSlide.previousIndex === index ? `is-leaving slide-${heroSlide.direction > 0 ? 'forward' : 'backward'}` : '',
+                ].filter(Boolean).join(' ')}
+                src={slide.src}
+                alt={heroIndex === index ? slide.alt : ''}
+                aria-hidden={heroIndex !== index}
+                fetchPriority={heroIndex === index ? 'high' : 'low'}
+                style={{ objectPosition: slide.position }}
+              />
+            ))}
             <div className="hero-shade" />
             <div className="hero-content">
               <span className="eyebrow hero-eyebrow"><i />{text.collection}</span>
@@ -535,9 +605,44 @@ function App() {
               </div>
             </div>
             <div className="hero-caption"><span className="caption-line" />{text.crafted}</div>
-            <span className="hero-index">01 <span>/</span> 04</span>
+            <div className="hero-controls" role="group" aria-label={language === 'ku' ? 'کۆنترۆڵی سلاید' : 'Slideshow controls'}>
+              <div className="hero-slide-picker">
+                {heroSlides.map((slide, index) => (
+                  <button
+                    key={slide.src}
+                    type="button"
+                    aria-label={text.heroSlideLabel.replace('{number}', String(index + 1))}
+                    aria-pressed={heroIndex === index}
+                    className={heroIndex === index ? 'active' : ''}
+                    onClick={() => {
+                      if (index === heroIndex) return
+                      setHeroSlide({
+                        index,
+                        previousIndex: heroIndex,
+                        direction: index > heroIndex ? 1 : -1,
+                      })
+                    }}
+                  />
+                ))}
+              </div>
+              <span className="hero-index" aria-live="polite">
+                {String(heroIndex + 1).padStart(2, '0')} <span>/</span> {String(heroSlides.length).padStart(2, '0')}
+              </span>
+            </div>
           </div>
           <a className="scroll-cue" href="#collection" aria-label={text.browse}><ArrowDown size={15} /><span>SCROLL TO DISCOVER</span></a>
+        </section>
+
+        <section className="trust-strip section-shell" aria-label={language === 'ku' ? 'زانیاریی فرۆشگا' : 'Store information'}>
+          {text.trustItems.map((item, index) => {
+            const Icon = [ShieldCheck, Check, MapPin][index]
+            return (
+              <article className="trust-item" key={item.title}>
+                <span className="trust-icon"><Icon size={17} strokeWidth={1.6} /></span>
+                <span><strong>{item.title}</strong><small>{item.detail}</small></span>
+              </article>
+            )
+          })}
         </section>
 
         <section className="collection section-shell" id="collection">
@@ -568,11 +673,9 @@ function App() {
               </div>
             )}
             {visibleProducts.map((product, index) => {
-              const selection = getProductSelection(product, selectedColors[product.id], selectedSizes[product.id])
-              const color = catalog.colors.find((item) => item.code === selection.colorCode)
+              const selection = getProductSelection(product, selectedSizes[product.id])
               const variant = selection.variant
-              const colorOptions = catalog.colors.filter((item) => product.variants.some((option) => option.colorCode === item.code))
-              const gallery = getVariantGallery(product, selectedColors[product.id], selectedSizes[product.id])
+              const gallery = getVariantGallery(product, selectedSizes[product.id])
               const image = gallery[0] || { url: product.imageUrl, altText: product.imageAlt || productName(product) }
               const price = formatPrice(variant?.priceMinor ?? product.priceMinor, variant?.currency || product.currency, language)
               return (
@@ -593,15 +696,10 @@ function App() {
                         ? variant.stockOnHand > 0 ? `${variant.stockOnHand} ${text.inStock}` : text.outOfStock
                         : text.stockUntracked}
                     </span>
+                    <span className="assigned-color">{text.assignedColor}: {variant?.colorName || '—'}</span>
                     <div className="product-options">
-                      <div className="swatches" role="group" aria-label={text.chooseColor}>
-                        {colorOptions.map((item) => {
-                          const hasStock = product.variants.some((option) => option.colorCode === item.code && option.isAvailable)
-                          return <button key={item.code} type="button" className={`swatch ${color?.code === item.code ? 'selected' : ''}`} style={{ '--swatch': item.hexValue }} aria-label={item.name} aria-pressed={color?.code === item.code} disabled={!hasStock} onClick={() => setSelectedColors({ ...selectedColors, [product.id]: item.code })} />
-                        })}
-                      </div>
                       <div className="size-list" aria-label={text.available}>{catalog.sizes.map((item) => {
-                        const sizeVariant = selection.variantsForColor.find((option) => option.sizeCode === item.code)
+                        const sizeVariant = product.variants.find((option) => option.sizeCode === item.code && option.isAvailable)
                         return <button key={item.code} type="button" className={variant?.sizeCode === item.code ? 'selected' : ''} aria-pressed={variant?.sizeCode === item.code} disabled={!sizeVariant?.isAvailable} onClick={() => setSelectedSizes({ ...selectedSizes, [product.id]: item.code })}>{item.label}</button>
                       })}</div>
                     </div>
@@ -642,14 +740,13 @@ function App() {
               </div>
 
               <div className="detail-choice-block">
-                <label className="option-label">{text.color}<strong>{detailSelection?.variant?.colorName}</strong></label>
-                <div className="swatches modal-swatches" role="group" aria-label={text.chooseColor}>{catalog.colors.filter((item) => detailProduct.variants.some((variant) => variant.colorCode === item.code)).map((item) => <button key={item.code} type="button" className={`swatch ${detailSelection?.colorCode === item.code ? 'selected' : ''}`} style={{ '--swatch': item.hexValue }} aria-label={item.name} aria-pressed={detailSelection?.colorCode === item.code} disabled={!detailProduct.variants.some((variant) => variant.colorCode === item.code && variant.isAvailable)} onClick={() => setSelectedColors({ ...selectedColors, [detailProduct.id]: item.code })} />)}</div>
+                <label className="option-label">{text.assignedColor}<strong>{detailSelection?.variant?.colorName || '—'}</strong></label>
               </div>
 
               <div className="detail-choice-block">
                 <label className="option-label size-label">{text.size}<strong>{detailSelection?.variant?.sizeLabel}</strong></label>
                 <div className="modal-sizes">{catalog.sizes.map((item) => {
-                  const sizeVariant = detailSelection?.variantsForColor.find((variant) => variant.sizeCode === item.code)
+                  const sizeVariant = detailProduct.variants.find((variant) => variant.sizeCode === item.code && variant.isAvailable)
                   return <button key={item.code} type="button" className={detailSelection?.variant?.sizeCode === item.code ? 'selected' : ''} aria-pressed={detailSelection?.variant?.sizeCode === item.code} disabled={!sizeVariant?.isAvailable} onClick={() => setSelectedSizes({ ...selectedSizes, [detailProduct.id]: item.code })}>{item.label}</button>
                 })}</div>
               </div>
@@ -764,7 +861,6 @@ function App() {
                 (() => {
                   const gallery = getVariantGallery(
                     quickView,
-                    quickSelection?.colorCode,
                     quickSelection?.variant?.sizeCode,
                   )
                   const activeImage = gallery[galleryIndex] || gallery[0] || { url: quickView.imageUrl, altText: quickView.imageAlt || productName(quickView) }
@@ -773,7 +869,6 @@ function App() {
               }</div>
               <div className="modal-gallery-thumbs">{getVariantGallery(
                 quickView,
-                quickSelection?.colorCode,
                 quickSelection?.variant?.sizeCode,
               ).map((image, index) => (
                 <button key={`${image.url}-${index}`} type="button" className={`gallery-thumb ${galleryIndex === index ? 'selected' : ''}`} aria-label={`View product image ${index + 1}`} onClick={() => setGalleryIndex(index)}>
@@ -789,13 +884,12 @@ function App() {
               <div className="modal-rule" />
               <span className="details-heading">{text.details}</span>
               <div className="product-detail-row"><span>{text.schoolStage}</span><strong>{stageName(quickView.stageCode)}</strong></div>
-              <div className="product-detail-row"><span>{text.available}</span><strong>{catalog.sizes.filter((item) => quickView.variants.some((variant) => variant.sizeCode === item.code && variant.colorCode === quickSelection?.colorCode && variant.isAvailable)).map((item) => item.label).join(' · ')}</strong></div>
+              <div className="product-detail-row"><span>{text.available}</span><strong>{catalog.sizes.filter((item) => quickView.variants.some((variant) => variant.sizeCode === item.code && variant.isAvailable)).map((item) => item.label).join(' · ')}</strong></div>
               <div className="product-detail-row"><span>{text.stock}</span><strong>{quickSelection?.variant?.trackInventory ? quickSelection.variant.stockOnHand > 0 ? quickSelection.variant.stockOnHand : text.outOfStock : text.stockUntracked}</strong></div>
-              <label className="option-label">{text.color}<strong>{quickSelection?.variant?.colorName}</strong></label>
-              <div className="swatches modal-swatches" role="group" aria-label={text.chooseColor}>{catalog.colors.filter((item) => quickView.variants.some((variant) => variant.colorCode === item.code)).map((item) => <button key={item.code} type="button" className={`swatch ${quickSelection?.colorCode === item.code ? 'selected' : ''}`} style={{ '--swatch': item.hexValue }} aria-label={item.name} aria-pressed={quickSelection?.colorCode === item.code} disabled={!quickView.variants.some((variant) => variant.colorCode === item.code && variant.isAvailable)} onClick={() => setSelectedColors({ ...selectedColors, [quickView.id]: item.code })} />)}</div>
+              <div className="product-detail-row"><span>{text.assignedColor}</span><strong>{quickSelection?.variant?.colorName || '—'}</strong></div>
               <label className="option-label size-label">{text.size}<strong>{quickSelection?.variant?.sizeLabel}</strong></label>
               <div className="modal-sizes">{catalog.sizes.map((item) => {
-                const sizeVariant = quickSelection?.variantsForColor.find((variant) => variant.sizeCode === item.code)
+                const sizeVariant = quickView.variants.find((variant) => variant.sizeCode === item.code && variant.isAvailable)
                 return <button key={item.code} type="button" className={quickSelection?.variant?.sizeCode === item.code ? 'selected' : ''} aria-pressed={quickSelection?.variant?.sizeCode === item.code} disabled={!sizeVariant?.isAvailable} onClick={() => setSelectedSizes({ ...selectedSizes, [quickView.id]: item.code })}>{item.label}</button>
               })}</div>
               <div className="size-guide-panel">

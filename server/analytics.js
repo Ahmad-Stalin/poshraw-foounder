@@ -9,6 +9,8 @@ function analyticsOriginGuard(configuredOrigins, isProduction) {
   if (!isProduction) {
     allowedOrigins.add('http://localhost:5173')
     allowedOrigins.add('http://127.0.0.1:5173')
+    allowedOrigins.add('http://localhost:5174')
+    allowedOrigins.add('http://127.0.0.1:5174')
   }
 
   return (request, response, next) => {

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, BarChart3, Box, ImagePlus, LogOut, PackageCheck, RefreshCw, Save, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Archive, BarChart3, Box, ImagePlus, LogOut, PackageCheck, Plus, RefreshCw, Save, ShieldCheck, Trash2 } from 'lucide-react'
 import './Admin.css'
 
-const orderStatusOptions = ['pending', 'confirmed', 'processing', 'ready', 'completed', 'cancelled']
+const orderStatusOptions = ['pending', 'confirmed', 'processing', 'ready', 'shipped', 'completed', 'cancelled']
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -100,7 +100,113 @@ function AuthScreen({ setup, onLogin, onSetup, initialError }) {
   )
 }
 
-function ProductEditor({ product, stages, onSaved }) {
+function ProductCreator({ stages, onCancel, onSaved }) {
+  const [sku, setSku] = useState('')
+  const [slug, setSlug] = useState('')
+  const [stageCode, setStageCode] = useState(stages[0]?.code || '')
+  const [status, setStatus] = useState('draft')
+  const [price, setPrice] = useState('')
+  const [translations, setTranslations] = useState({
+    en: { name: '', shortDescription: '', description: '', material: '', careInstructions: '' },
+    ckb: { name: '', shortDescription: '', description: '', material: '', careInstructions: '' },
+  })
+  const [saving, setSaving] = useState('')
+  const [error, setError] = useState('')
+
+  function updateTranslation(locale, field, value) {
+    setTranslations((current) => ({
+      ...current,
+      [locale]: { ...current[locale], [field]: value },
+    }))
+  }
+
+  function suggestSlug(value) {
+    return value.toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+_+/g, '-')
+      .trim('-')
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setError('')
+    setSaving('product')
+    try {
+      const priceMinor = inputToAmount(price, 'IQD')
+      if (priceMinor === undefined) {
+        setError('Enter a valid non-negative price.')
+        setSaving('')
+        return
+      }
+      await api('/api/admin/products', {
+        method: 'POST',
+        body: {
+          sku: sku.trim(),
+          slug: slug.trim(),
+          stageCode,
+          status,
+          priceMinor,
+          translations: {
+            en: { name: translations.en.name, shortDescription: translations.en.shortDescription, description: translations.en.description, material: translations.en.material, careInstructions: translations.en.careInstructions },
+            ckb: { name: translations.ckb.name, shortDescription: translations.ckb.shortDescription, description: translations.ckb.description, material: translations.ckb.material, careInstructions: translations.ckb.careInstructions },
+          },
+        },
+      })
+      onSaved()
+    } catch (error) {
+      setError(error.message)
+    } finally {
+      setSaving('')
+    }
+  }
+
+  return (
+    <div className="admin-editor">
+      <form className="admin-section" onSubmit={handleSubmit}>
+        <div className="admin-section-heading">
+          <div><p className="admin-eyebrow">NEW PRODUCT</p><h2>Create product</h2></div>
+          <button type="submit" className="admin-primary-button" disabled={saving !== ''}><Save size={15} />Create product</button>
+          <button type="button" className="admin-secondary-button" onClick={onCancel}>Cancel</button>
+        </div>
+        {error && <p className="admin-error admin-inline-error" role="alert">{error}</p>}
+        <div className="admin-fields admin-fields-inline">
+          <label>Product SKU
+            <input type="text" placeholder="e.g. POSH-KG-007" value={sku} onChange={(event) => { setSku(event.target.value); if (!slug) setSlug(suggestSlug(event.target.value)) }} required />
+          </label>
+          <label>URL slug
+            <input type="text" placeholder="e.g. winter-sweater" value={slug} onChange={(event) => setSlug(event.target.value)} required />
+          </label>
+          <label>Publication
+            <select value={status} onChange={(event) => setStatus(event.target.value)}><option value="draft">Draft</option><option value="active">Active</option></select>
+          </label>
+          <label>Base price (IQD)
+            <input type="number" min="0" step="1" placeholder="Leave blank for price on request" value={price} onChange={(event) => setPrice(event.target.value)} />
+          </label>
+          <label>School stage
+            <select value={stageCode} onChange={(event) => setStageCode(event.target.value)}>
+              {stages.map((stage) => <option key={stage.code} value={stage.code}>{stage.nameEn}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="admin-translations">
+          {['en', 'ckb'].map((locale) => (
+            <fieldset key={locale} className="admin-translation">
+              <legend>{locale === 'en' ? 'English' : 'Sorani Kurdish'}</legend>
+              <label>Name<input value={translations[locale]?.name || ''} onChange={(event) => updateTranslation(locale, 'name', event.target.value)} required /></label>
+              <label>Short description<textarea rows="2" value={translations[locale]?.shortDescription || ''} onChange={(event) => updateTranslation(locale, 'shortDescription', event.target.value)} /></label>
+              <label>Full description<textarea rows="3" value={translations[locale]?.description || ''} onChange={(event) => updateTranslation(locale, 'description', event.target.value)} /></label>
+              <label>Material<input value={translations[locale]?.material || ''} onChange={(event) => updateTranslation(locale, 'material', event.target.value)} /></label>
+              <label>Care instructions<input value={translations[locale]?.careInstructions || ''} onChange={(event) => updateTranslation(locale, 'careInstructions', event.target.value)} /></label>
+            </fieldset>
+          ))}
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function ProductEditor({ product, stages, colors, sizes, onSaved }) {
   const [draft, setDraft] = useState(() => ({
     stageCode: product.stageCode,
     status: product.status,
@@ -118,6 +224,9 @@ function ProductEditor({ product, stages, onSaved }) {
   })))
   const [saving, setSaving] = useState('')
   const [message, setMessage] = useState('')
+  const [addingVariant, setAddingVariant] = useState(false)
+  const [newVariant, setNewVariant] = useState({ colorCode: '', sizeCode: '', variantSku: '', price: '', trackInventory: false, stockOnHand: '' })
+  const [archiving, setArchiving] = useState(false)
 
   function updateTranslation(locale, field, value) {
     setDraft((current) => ({
@@ -196,10 +305,77 @@ function ProductEditor({ product, stages, onSaved }) {
     }
   }
 
+  async function archiveProduct() {
+    if (!confirm('Archive this product? It will no longer appear on the storefront, but can be restored by editing it.')) return
+    setArchiving(true)
+    setMessage('')
+    try {
+      await api(`/api/admin/products/${product.id}`, { method: 'DELETE' })
+      onSaved()
+    } catch (error) {
+      setMessage(error.message)
+      setArchiving(false)
+    }
+  }
+
+  async function addVariant(event) {
+    event.preventDefault()
+    const priceMinor = inputToAmount(newVariant.price, 'IQD')
+    if (priceMinor === undefined) {
+      setMessage('Enter a valid non-negative price.')
+      return
+    }
+    setSaving('newVariant')
+    setMessage('')
+    try {
+      const result = await api(`/api/admin/products/${product.id}/variants`, {
+        method: 'POST',
+        body: {
+          colorCode: newVariant.colorCode,
+          sizeCode: newVariant.sizeCode,
+          variantSku: newVariant.variantSku,
+          priceMinor,
+          trackInventory: newVariant.trackInventory,
+          stockOnHand: newVariant.trackInventory ? Number(newVariant.stockOnHand) : null,
+        },
+      })
+      const created = result.variant
+      setVariants((current) => [...current, {
+        ...created,
+        colorNameEn: colors.find((c) => c.code === created.colorCode)?.nameEn || '',
+        colorNameCkb: colors.find((c) => c.code === created.colorCode)?.nameCkb || '',
+        colorHex: colors.find((c) => c.code === created.colorCode)?.hexValue || '',
+        sizeLabel: sizes.find((s) => s.code === created.sizeCode)?.label || '',
+        priceInput: amountToInput(created.priceMinor, 'IQD'),
+        stockInput: created.stockOnHand === null ? '' : String(created.stockOnHand),
+      }])
+      setAddingVariant(false)
+      setNewVariant({ colorCode: '', sizeCode: '', variantSku: '', price: '', trackInventory: false, stockOnHand: '' })
+      setMessage(`${created.colorCode} / ${created.sizeCode} variant added.`)
+      onSaved()
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setSaving('')
+    }
+  }
+
+  async function deactivateVariant(variantId) {
+    if (!confirm('Deactivate this variant? It will no longer appear on the storefront.')) return
+    try {
+      await api(`/api/admin/variants/${variantId}`, { method: 'DELETE' })
+      setVariants((current) => current.filter((v) => v.id !== variantId))
+      setMessage('Variant deactivated.')
+      onSaved()
+    } catch (error) {
+      setMessage(error.message)
+    }
+  }
+
   return (
     <div className="admin-editor">
       <form className="admin-section" onSubmit={saveProduct}>
-        <div className="admin-section-heading"><div><p className="admin-eyebrow">PRODUCT</p><h2>{product.sku}</h2></div><button className="admin-primary-button" type="submit" disabled={saving !== ''}><Save size={15} />Save product</button></div>
+        <div className="admin-section-heading"><div><p className="admin-eyebrow">PRODUCT</p><h2>{product.sku}</h2></div><button className="admin-primary-button" type="submit" disabled={saving !== ''}><Save size={15} />Save product</button><button type="button" className="admin-danger-button" disabled={archiving} onClick={archiveProduct}><Archive size={15} />Archive product</button></div>
         <div className="admin-fields admin-fields-inline">
           <label>School stage<select value={draft.stageCode} onChange={(event) => setDraft({ ...draft, stageCode: event.target.value })}>{stages.map((stage) => <option key={stage.code} value={stage.code}>{stage.nameEn}</option>)}</select></label>
           <label>Publication<select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value })}><option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option></select></label>
@@ -226,10 +402,44 @@ function ProductEditor({ product, stages, onSaved }) {
       </section>
 
       <section className="admin-section">
-        <div className="admin-section-heading"><div><p className="admin-eyebrow">VARIANTS</p><h2>Pricing & inventory</h2></div></div>
+        <div className="admin-section-heading"><div><p className="admin-eyebrow">VARIANTS</p><h2>Pricing & inventory</h2></div><button className="admin-secondary-button" type="button" onClick={() => setAddingVariant(!addingVariant)}><Plus size={15} />{addingVariant ? 'Cancel' : 'Add variant'}</button></div>
+        {addingVariant && (
+          <form className="admin-variant-form" onSubmit={addVariant}>
+            <label>Color
+              <select value={newVariant.colorCode} onChange={(event) => setNewVariant({ ...newVariant, colorCode: event.target.value })} required>
+                <option value="">Select a color</option>
+                {colors.map((color) => <option key={color.code} value={color.code}>{color.nameEn}</option>)}
+              </select>
+            </label>
+            <label>Size
+              <select value={newVariant.sizeCode} onChange={(event) => setNewVariant({ ...newVariant, sizeCode: event.target.value })} required>
+                <option value="">Select a size</option>
+                {sizes.map((size) => <option key={size.code} value={size.code}>{size.label}</option>)}
+              </select>
+            </label>
+            <label>Variant SKU
+              <input type="text" placeholder="e.g. POSH-KG-001-NAVY-S" value={newVariant.variantSku} onChange={(event) => setNewVariant({ ...newVariant, variantSku: event.target.value })} required />
+            </label>
+            <label>Price (IQD)
+              <input type="number" min="0" step="1" placeholder="Leave blank for base price" value={newVariant.price} onChange={(event) => setNewVariant({ ...newVariant, price: event.target.value })} />
+            </label>
+            <div className="variant-sku-field">
+              <label><input type="checkbox" checked={newVariant.trackInventory} onChange={(event) => setNewVariant({ ...newVariant, trackInventory: event.target.checked })} /> Track stock for this variant</label>
+              {newVariant.trackInventory && (
+                <label>Stock on hand
+                  <input type="number" min="0" step="1" value={newVariant.stockOnHand} onChange={(event) => setNewVariant({ ...newVariant, stockOnHand: event.target.value })} required />
+                </label>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', gridColumn: '1 / -1' }}>
+              <button type="submit" className="admin-primary-button" disabled={saving !== ''}><Plus size={15} />Add variant</button>
+              <button type="button" className="admin-secondary-button" onClick={() => setAddingVariant(false)}>Cancel</button>
+            </div>
+          </form>
+        )}
         <div className="variant-table-wrap">
           <table className="variant-table">
-            <thead><tr><th>Color</th><th>Size</th><th>Price override (IQD)</th><th>Track stock</th><th>On hand</th><th /></tr></thead>
+            <thead><tr><th>Color</th><th>Size</th><th>Price override (IQD)</th><th>Track stock</th><th>On hand</th><th>Actions</th></tr></thead>
             <tbody>{variants.map((variant) => (
               <tr key={variant.id}>
                 <td><span className="variant-color"><i style={{ background: variant.colorHex }} />{variant.colorNameEn}</span></td>
@@ -237,7 +447,7 @@ function ProductEditor({ product, stages, onSaved }) {
                 <td><input aria-label={`${variant.colorNameEn} ${variant.sizeLabel} price in IQD`} type="number" min="0" step="1" value={variant.priceInput} placeholder="Use base" onChange={(event) => setVariants((current) => current.map((item) => item.id === variant.id ? { ...item, priceInput: event.target.value } : item))} /></td>
                 <td><input aria-label={`Track stock for ${variant.colorNameEn} ${variant.sizeLabel}`} type="checkbox" checked={variant.trackInventory} onChange={(event) => setVariants((current) => current.map((item) => item.id === variant.id ? { ...item, trackInventory: event.target.checked, stockInput: event.target.checked ? item.stockInput ?? '0' : '' } : item))} /></td>
                 <td><input aria-label={`${variant.colorNameEn} ${variant.sizeLabel} stock`} type="number" min="0" step="1" disabled={!variant.trackInventory} value={variant.trackInventory ? variant.stockInput ?? '' : ''} onChange={(event) => setVariants((current) => current.map((item) => item.id === variant.id ? { ...item, stockInput: event.target.value } : item))} /></td>
-                <td><button type="button" className="table-save" disabled={saving !== ''} onClick={() => saveVariant(variant)}>{saving === variant.id ? 'Saving...' : 'Save'}</button></td>
+                <td><button type="button" className="table-save" disabled={saving !== ''} onClick={() => saveVariant(variant)}>{saving === variant.id ? 'Saving...' : 'Save'}</button><button type="button" className="admin-danger-button" onClick={() => deactivateVariant(variant.id)}>Deactivate</button></td>
               </tr>
             ))}</tbody>
           </table>
@@ -580,8 +790,10 @@ function AdminApp() {
   const [authError, setAuthError] = useState('')
   const [dataStatus, setDataStatus] = useState('idle')
   const [dataError, setDataError] = useState('')
-  const [products, setProducts] = useState([])
+   const [products, setProducts] = useState([])
   const [stages, setStages] = useState([])
+  const [colors, setColors] = useState([])
+  const [sizes, setSizes] = useState([])
   const [orders, setOrders] = useState([])
   const [analytics, setAnalytics] = useState(null)
   const [accounting, setAccounting] = useState(null)
@@ -593,6 +805,7 @@ function AdminApp() {
   const [selectedTab, setSelectedTab] = useState('products')
   const [selectedOrderStatuses, setSelectedOrderStatuses] = useState({})
   const [reloadToken, setReloadToken] = useState(0)
+  const [creatingProduct, setCreatingProduct] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -623,6 +836,8 @@ function AdminApp() {
       .then(([productData, orderData, analyticsData, accountingData]) => {
         setProducts(productData.products)
         setStages(productData.stages)
+        setColors(productData.colors || [])
+        setSizes(productData.sizes || [])
         setOrders(orderData.orders)
         setAnalytics(analyticsData)
         setAccounting(accountingData)
@@ -648,6 +863,18 @@ function AdminApp() {
     const result = await api('/api/admin/setup', { method: 'POST', body: credentials })
     setAdmin(result.admin)
     setSetup({ setupRequired: false, setupEnabled: false })
+  }
+
+  async function handleCreateProduct(credentials) {
+    setDataError('')
+    try {
+      await api('/api/admin/products', { method: 'POST', body: credentials })
+      setCreatingProduct(false)
+      setSelectedProductId(products[0]?.id || '')
+      refreshData()
+    } catch (error) {
+      setDataError(error.message)
+    }
   }
 
   async function handleLogout() {
@@ -717,9 +944,16 @@ function AdminApp() {
         ) : selectedTab === 'products' ? (
           <div className="admin-workspace">
             <aside className="admin-product-list" aria-label="Product list">
+              <div style={{ padding: '8px 15px', borderBottom: '1px solid #edf0f4' }}><button className="admin-primary-button" type="button" style={{ width: '100%', fontSize: '10.5px' }} onClick={() => setCreatingProduct(true)}><Plus size={14} />New product</button></div>
               {products.map((product) => <button key={product.id} type="button" className={selectedProductId === product.id ? 'active' : ''} onClick={() => setSelectedProductId(product.id)}><span>{product.translations.en?.name || product.sku}</span><small>{product.sku} · {product.status}</small></button>)}
             </aside>
-            {selectedProduct && <ProductEditor key={selectedProduct.id} product={selectedProduct} stages={stages} onSaved={refreshData} />}
+            {creatingProduct ? (
+              <ProductCreator stages={stages} onCancel={() => setCreatingProduct(false)} onSaved={() => { setCreatingProduct(false); refreshData() }} />
+            ) : selectedProduct ? (
+              <ProductEditor key={selectedProduct.id} product={selectedProduct} stages={stages} colors={colors} sizes={sizes} onSaved={refreshData} />
+            ) : (
+              <div className="admin-section"><p>Select a product to edit, or create a new one.</p></div>
+            )}
           </div>
         ) : (
           <section className="admin-orders">

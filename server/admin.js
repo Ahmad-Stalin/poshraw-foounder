@@ -3,17 +3,19 @@ import { promisify } from 'node:util'
 import { createRateLimiter } from './rate-limits.js'
 import { withWriteTransaction } from './transactions.js'
 import { queueOrderEmail } from './email-notifications.js'
+import { formatMinorAmount, queueWhatsAppNotification } from './whatsapp-notifications.js'
 import { reportServerError } from './monitoring.js'
 
 const scrypt = promisify(scryptCallback)
 const sessionCookieName = 'poshraw_admin'
 const sessionDurationMs = 8 * 60 * 60 * 1000
-const allowedOrderStatuses = new Set(['pending', 'confirmed', 'processing', 'ready', 'completed', 'cancelled'])
+const allowedOrderStatuses = new Set(['pending', 'confirmed', 'processing', 'ready', 'shipped', 'completed', 'cancelled'])
 const orderStatusTransitions = {
   pending: new Set(['confirmed', 'processing', 'ready', 'completed', 'cancelled']),
   confirmed: new Set(['processing', 'ready', 'completed', 'cancelled']),
-  processing: new Set(['ready', 'completed', 'cancelled']),
-  ready: new Set(['completed', 'cancelled']),
+  processing: new Set(['ready', 'shipped', 'completed', 'cancelled']),
+  ready: new Set(['shipped', 'completed', 'cancelled']),
+  shipped: new Set(['completed']),
   completed: new Set(),
   cancelled: new Set(),
 }
@@ -263,6 +265,8 @@ export function registerAdminRoutes(app, {
   if (!isProduction) {
     allowedOrigins.add('http://localhost:5173')
     allowedOrigins.add('http://127.0.0.1:5173')
+    allowedOrigins.add('http://localhost:5174')
+    allowedOrigins.add('http://127.0.0.1:5174')
   }
   const checkOrigin = originGuard(allowedOrigins)
   const requireAdmin = makeAdminGuard(getDatabase, isProduction)
@@ -407,10 +411,12 @@ export function registerAdminRoutes(app, {
 
   app.get('/api/admin/products', requireAdmin, async (_request, response) => {
     try {
-      const database = getDatabase()
-      const [products, stagesResult] = await Promise.all([
+       const database = getDatabase()
+      const [products, stagesResult, colorsResult, sizesResult] = await Promise.all([
         buildAdminProducts(database),
         database.query('SELECT code, name_en, name_ckb, sort_order FROM school_stages ORDER BY sort_order'),
+        database.query('SELECT code, name_en, name_ckb, hex_value, sort_order FROM color_options WHERE is_active ORDER BY sort_order'),
+        database.query('SELECT code, label, sort_order FROM sizes WHERE is_active ORDER BY sort_order'),
       ])
       response.json({
         products,
@@ -419,6 +425,18 @@ export function registerAdminRoutes(app, {
           nameEn: stage.name_en,
           nameCkb: stage.name_ckb,
           sortOrder: stage.sort_order,
+        })),
+        colors: colorsResult.rows.map((color) => ({
+          code: color.code,
+          nameEn: color.name_en,
+          nameCkb: color.name_ckb,
+          hexValue: color.hex_value.trim(),
+          sortOrder: color.sort_order,
+        })),
+        sizes: sizesResult.rows.map((size) => ({
+          code: size.code,
+          label: size.label,
+          sortOrder: size.sort_order,
         })),
       })
     } catch (error) {
@@ -527,6 +545,247 @@ export function registerAdminRoutes(app, {
       console.error('Admin image update failed:', error)
       reportServerError(error, 'admin.image_update')
       response.status(400).json({ error: 'Unable to update product photos' })
+    }
+  })
+
+  app.post('/api/admin/products', checkOrigin, requireAdmin, async (request, response) => {
+    const { sku, slug, stageCode, status, priceMinor, translations } = request.body || {}
+    const priceMinorParsed = parseMinorAmount(priceMinor)
+    if (priceMinorParsed === undefined) {
+      response.status(400).json({ error: 'Invalid product price' })
+      return
+    }
+    if (typeof sku !== 'string' || !/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(sku.trim())) {
+      response.status(400).json({ error: 'Enter a valid SKU (uppercase letters, numbers, and hyphens)' })
+      return
+    }
+    if (typeof slug !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug.trim())) {
+      response.status(400).json({ error: 'Enter a valid URL slug (lowercase letters, numbers, and hyphens)' })
+      return
+    }
+    if (typeof stageCode !== 'string' || !stageCode.trim()) {
+      response.status(400).json({ error: 'Select a school stage' })
+      return
+    }
+    if (!['draft', 'active'].includes(status)) {
+      response.status(400).json({ error: 'Status must be draft or active' })
+      return
+    }
+    for (const locale of ['en', 'ckb']) {
+      const translation = translations?.[locale]
+      if (!translation || typeof translation.name !== 'string' || !translation.name.trim()) {
+        response.status(400).json({ error: 'Both English and Sorani product names are required' })
+        return
+      }
+    }
+
+    try {
+      const database = getDatabase()
+      const result = await withWriteTransaction(database, async (transaction) => {
+        const stageResult = await transaction.query('SELECT code FROM school_stages WHERE code = $1', [stageCode])
+        if (!stageResult.rows[0]) return { error: 'Invalid school stage', status: 400 }
+
+        const existingSku = await transaction.query('SELECT id FROM products WHERE sku = $1', [sku.trim()])
+        if (existingSku.rows[0]) return { error: 'A product with this SKU already exists', status: 409 }
+
+        const existingSlug = await transaction.query('SELECT id FROM products WHERE slug = $1', [slug.trim()])
+        if (existingSlug.rows[0]) return { error: 'A product with this URL slug already exists', status: 409 }
+
+        const created = await transaction.query(
+          `INSERT INTO products (sku, slug, stage_code, status, price_minor)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id, sku, slug, stage_code, status, price_minor, currency, created_at, updated_at`,
+          [sku.trim(), slug.trim(), stageCode, status, priceMinorParsed],
+        )
+        const product = created.rows[0]
+
+        for (const locale of ['en', 'ckb']) {
+          const translation = translations[locale]
+          await transaction.query(
+            `INSERT INTO product_translations
+               (product_id, locale, name, short_description, description, material, care_instructions)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              product.id,
+              locale,
+              translation.name.trim(),
+              String(translation.shortDescription || '').trim(),
+              String(translation.description || '').trim(),
+              translation.material ? String(translation.material) : null,
+              translation.careInstructions ? String(translation.careInstructions) : null,
+            ],
+          )
+        }
+
+        return { id: product.id }
+      })
+
+      if (result.error) {
+        response.status(result.status).json({ error: result.error })
+        return
+      }
+
+      const product = (await buildAdminProducts(database)).find((p) => p.id === result.id)
+      response.status(201).json({ product })
+    } catch (error) {
+      console.error('Admin product creation failed:', error)
+      reportServerError(error, 'admin.product_create')
+      response.status(500).json({ error: 'Unable to create product' })
+    }
+  })
+
+  app.delete('/api/admin/products/:id', checkOrigin, requireAdmin, async (request, response) => {
+    try {
+      const database = getDatabase()
+      const result = await withWriteTransaction(database, async (transaction) => {
+        const productResult = await transaction.query(
+          `UPDATE products
+           SET status = 'archived', archived_at = COALESCE(archived_at, now())
+           WHERE id = $1 AND status <> 'archived'
+           RETURNING id`,
+          [request.params.id],
+        )
+        if (!productResult.rows[0]) return { error: 'Product not found or already archived', status: 404 }
+        return { id: productResult.rows[0].id }
+      })
+
+      if (result.error) {
+        response.status(result.status).json({ error: result.error })
+        return
+      }
+
+      response.json({ archived: true })
+    } catch (error) {
+      console.error('Admin product archive failed:', error)
+      reportServerError(error, 'admin.product_archive')
+      response.status(500).json({ error: 'Unable to archive product' })
+    }
+  })
+
+  app.post('/api/admin/products/:id/variants', checkOrigin, requireAdmin, async (request, response) => {
+    const { colorCode, sizeCode, variantSku, priceMinor, trackInventory, stockOnHand } = request.body || {}
+    const priceMinorParsed = parseMinorAmount(priceMinor)
+    if (priceMinorParsed === undefined) {
+      response.status(400).json({ error: 'Invalid variant price' })
+      return
+    }
+    if (typeof colorCode !== 'string' || !colorCode.trim() || typeof sizeCode !== 'string' || !sizeCode.trim()) {
+      response.status(400).json({ error: 'Color and size must be selected' })
+      return
+    }
+    if (typeof variantSku !== 'string' || !variantSku.trim()) {
+      response.status(400).json({ error: 'Variant SKU is required' })
+      return
+    }
+    if (typeof trackInventory !== 'boolean') {
+      response.status(400).json({ error: 'Invalid trackInventory value' })
+      return
+    }
+    if (trackInventory && (!Number.isSafeInteger(stockOnHand) || stockOnHand < 0)) {
+      response.status(400).json({ error: 'Tracked stock must be a non-negative integer' })
+      return
+    }
+
+    try {
+      const database = getDatabase()
+      const result = await withWriteTransaction(database, async (transaction) => {
+        const productResult = await transaction.query(
+          `SELECT id FROM products WHERE id = $1 AND status <> 'archived'`,
+          [request.params.id],
+        )
+        if (!productResult.rows[0]) return { error: 'Product not found or archived', status: 404 }
+
+        const colorResult = await transaction.query(
+          'SELECT code FROM color_options WHERE code = $1 AND is_active',
+          [colorCode],
+        )
+        if (!colorResult.rows[0]) return { error: 'Invalid or inactive color', status: 400 }
+
+        const sizeResult = await transaction.query(
+          'SELECT code FROM sizes WHERE code = $1 AND is_active',
+          [sizeCode],
+        )
+        if (!sizeResult.rows[0]) return { error: 'Invalid or inactive size', status: 400 }
+
+        const existingSku = await transaction.query(
+          'SELECT id FROM product_variants WHERE variant_sku = $1',
+          [variantSku.trim()],
+        )
+        if (existingSku.rows[0]) return { error: 'A variant with this SKU already exists', status: 409 }
+
+        const existingCombo = await transaction.query(
+          'SELECT id FROM product_variants WHERE product_id = $1 AND color_code = $2 AND size_code = $3',
+          [request.params.id, colorCode, sizeCode],
+        )
+        if (existingCombo.rows[0]) return { error: 'A variant with this color and size already exists for this product', status: 409 }
+
+        const created = await transaction.query(
+           `INSERT INTO product_variants
+              (product_id, color_code, size_code, variant_sku, price_minor, track_inventory, stock_on_hand)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id, variant_sku, color_code, size_code, price_minor, track_inventory, stock_on_hand, low_stock_threshold, is_active, created_at`,
+          [
+            request.params.id,
+            colorCode,
+            sizeCode,
+            variantSku.trim(),
+            priceMinorParsed,
+            trackInventory,
+            trackInventory ? stockOnHand : null,
+          ],
+        )
+        return { variant: created.rows[0] }
+      })
+
+      if (result.error) {
+        response.status(result.status).json({ error: result.error })
+        return
+      }
+
+      const variant = result.variant
+      response.status(201).json({
+        variant: {
+          id: variant.id,
+          variantSku: variant.variant_sku,
+          colorCode: variant.color_code,
+          sizeCode: variant.size_code,
+          priceMinor: variant.price_minor === null ? null : Number(variant.price_minor),
+          trackInventory: variant.track_inventory,
+          stockOnHand: variant.stock_on_hand,
+          lowStockThreshold: variant.low_stock_threshold,
+          isActive: variant.is_active,
+          createdAt: variant.created_at,
+        },
+      })
+    } catch (error) {
+      console.error('Admin variant creation failed:', error)
+      reportServerError(error, 'admin.variant_create')
+      response.status(500).json({ error: 'Unable to create variant' })
+    }
+  })
+
+  app.delete('/api/admin/variants/:id', checkOrigin, requireAdmin, async (request, response) => {
+    try {
+      const database = getDatabase()
+      const result = await withWriteTransaction(database, async (transaction) => {
+        const variantResult = await transaction.query(
+          'UPDATE product_variants SET is_active = false WHERE id = $1 AND is_active = true RETURNING id',
+          [request.params.id],
+        )
+        if (!variantResult.rows[0]) return { error: 'Variant not found or already deactivated', status: 404 }
+        return { id: variantResult.rows[0].id }
+      })
+
+      if (result.error) {
+        response.status(result.status).json({ error: result.error })
+        return
+      }
+
+      response.json({ deactivated: true })
+    } catch (error) {
+      console.error('Admin variant deactivation failed:', error)
+      reportServerError(error, 'admin.variant_deactivate')
+      response.status(500).json({ error: 'Unable to deactivate variant' })
     }
   })
 
@@ -658,7 +917,9 @@ export function registerAdminRoutes(app, {
       const database = getDatabase()
       const updated = await withWriteTransaction(database, async (transaction) => {
         const currentResult = await transaction.query(
-          `SELECT o.id, o.status, o.order_number, c.email, c.preferred_locale
+          `SELECT o.id, o.status, o.order_number, o.fulfillment_method,
+                  o.customer_phone_snapshot, o.whatsapp_updates_consent_at,
+                  c.email, c.preferred_locale
            FROM orders o
            LEFT JOIN customers c ON c.id = o.customer_id
            WHERE o.id = $1 FOR UPDATE OF o`,
@@ -667,6 +928,11 @@ export function registerAdminRoutes(app, {
         const current = currentResult.rows[0]
         if (!current) return null
         if (current.status === newStatus) return current
+        if (newStatus === 'shipped' && current.fulfillment_method !== 'delivery') {
+          const error = new Error('Only delivery orders can be marked as shipped.')
+          error.status = 409
+          throw error
+        }
         if (!orderStatusTransitions[current.status]?.has(newStatus)) {
           const error = new Error(`Cannot move an order from ${current.status} to ${newStatus}.`)
           error.status = 409
@@ -724,7 +990,25 @@ export function registerAdminRoutes(app, {
             recipientEmail: current.email,
             locale: current.preferred_locale,
             notificationType: 'order_status',
-            payload: { orderNumber: current.order_number, status: newStatus },
+            payload: {
+              orderNumber: current.order_number,
+              status: newStatus,
+              fulfillmentMethod: current.fulfillment_method,
+            },
+          })
+        }
+        if (current.whatsapp_updates_consent_at && current.customer_phone_snapshot) {
+          await queueWhatsAppNotification(transaction, {
+            orderId: current.id,
+            statusEventId: statusEvent.rows[0].id,
+            recipientPhone: current.customer_phone_snapshot,
+            locale: current.preferred_locale,
+            notificationType: 'order_status',
+            payload: {
+            orderNumber: current.order_number,
+            status: newStatus,
+            fulfillmentMethod: current.fulfillment_method,
+            },
           })
         }
         return { id: current.id, status: newStatus }
@@ -855,8 +1139,12 @@ export function registerAdminRoutes(app, {
     try {
       const result = await withWriteTransaction(getDatabase(), async (transaction) => {
         const orderResult = await transaction.query(
-          `SELECT id, order_number, status, payment_status, currency
-           FROM orders WHERE id = $1 FOR UPDATE`,
+          `SELECT o.id, o.order_number, o.status, o.payment_status, o.currency,
+                  o.customer_phone_snapshot, o.whatsapp_updates_consent_at,
+                  c.email, c.preferred_locale
+           FROM orders o
+           LEFT JOIN customers c ON c.id = o.customer_id
+           WHERE o.id = $1 FOR UPDATE OF o`,
           [request.params.id],
         )
         const order = orderResult.rows[0]
@@ -941,7 +1229,7 @@ export function registerAdminRoutes(app, {
           amountRemaining -= refundAmount
         }
         const stillPaid = remainingPaid - amountMinor
-        const updatedOrder = await transaction.query(
+        const paymentStatus = await transaction.query(
           `UPDATE orders SET payment_status = CASE
              WHEN $1 = 0 AND COALESCE(total_minor, 0) <= (
                SELECT COALESCE(SUM(amount_minor), 0) FROM payments
@@ -958,10 +1246,36 @@ export function registerAdminRoutes(app, {
            RETURNING payment_status`,
           [stillPaid, order.id],
         )
+        const refundPayload = {
+          orderNumber: order.order_number,
+          amount: formatMinorAmount(amountMinor, order.currency.trim(), order.preferred_locale || 'en'),
+          paymentStatus: paymentStatus.rows[0].payment_status,
+        }
+        const refundIdempotencyKey = `refund:${refunds[0]}`
+        if (order.email) {
+          await queueOrderEmail(transaction, {
+            orderId: order.id,
+            recipientEmail: order.email,
+            locale: order.preferred_locale || 'en',
+            notificationType: 'refund',
+            idempotencyKey: refundIdempotencyKey,
+            payload: refundPayload,
+          })
+        }
+        if (order.whatsapp_updates_consent_at && order.customer_phone_snapshot) {
+          await queueWhatsAppNotification(transaction, {
+            orderId: order.id,
+            recipientPhone: order.customer_phone_snapshot,
+            locale: order.preferred_locale || 'en',
+            notificationType: 'refund',
+            idempotencyKey: refundIdempotencyKey,
+            payload: refundPayload,
+          })
+        }
         return {
           refundIds: refunds,
           orderId: order.id,
-          paymentStatus: updatedOrder.rows[0].payment_status,
+          paymentStatus: paymentStatus.rows[0].payment_status,
           amountMinor,
           currency: order.currency.trim(),
         }

@@ -2,6 +2,7 @@ import { withWriteTransaction } from './transactions.js'
 import { createRateLimiter } from './rate-limits.js'
 import { queueOrderEmail } from './email-notifications.js'
 import { reportServerError } from './monitoring.js'
+import { normalizeWhatsAppPhone, queueWhatsAppNotification } from './whatsapp-notifications.js'
 
 const orderWindowMs = 15 * 60 * 1000
 const orderLimit = 8
@@ -38,6 +39,7 @@ function validateOrder(body) {
   const deliveryAddress = typeof body?.deliveryAddress === 'string' ? body.deliveryAddress.trim() : ''
   const note = typeof body?.note === 'string' ? body.note.trim() : ''
   const privacyAccepted = body?.privacyAccepted === true
+  const whatsappUpdatesAccepted = body?.whatsappUpdatesAccepted === true
   const items = body?.items
 
   if (customerName.length < 2 || customerName.length > 120) {
@@ -51,6 +53,10 @@ function validateOrder(body) {
   }
   if (!locale) throw validationError('Unsupported language.')
   if (!privacyAccepted) throw validationError('Consent is required to save order details.')
+  const whatsappPhone = whatsappUpdatesAccepted ? normalizeWhatsAppPhone(phone) : null
+  if (whatsappUpdatesAccepted && !whatsappPhone) {
+    throw validationError('Enter a WhatsApp number in international format, such as +9647701234567.')
+  }
   if (!['pickup', 'delivery'].includes(fulfillmentMethod)) {
     throw validationError('Choose pickup or delivery.')
   }
@@ -76,7 +82,18 @@ function validateOrder(body) {
     return { variantId: item.variantId, quantity }
   })
 
-  return { customerName, phone, email: email || null, locale, fulfillmentMethod, deliveryAddress, note, items: normalizedItems }
+  return {
+    customerName,
+    phone,
+    email: email || null,
+    locale,
+    fulfillmentMethod,
+    deliveryAddress,
+    note,
+    whatsappUpdatesAccepted,
+    whatsappPhone,
+    items: normalizedItems,
+  }
 }
 
 export function registerOrderRoutes(app, { getDatabase, configuredOrigins = [], isProduction = false }) {
@@ -84,6 +101,8 @@ export function registerOrderRoutes(app, { getDatabase, configuredOrigins = [], 
   if (!isProduction) {
     allowedOrigins.add('http://localhost:5173')
     allowedOrigins.add('http://127.0.0.1:5173')
+    allowedOrigins.add('http://localhost:5174')
+    allowedOrigins.add('http://127.0.0.1:5174')
   }
   const checkOrderOrigin = orderOriginGuard(allowedOrigins)
   const rateLimitOrders = createRateLimiter(getDatabase, {
@@ -179,9 +198,10 @@ export function registerOrderRoutes(app, { getDatabase, configuredOrigins = [], 
              subtotal_minor, delivery_minor, total_minor,
              customer_name_snapshot, customer_phone_snapshot,
              delivery_address_snapshot, customer_note,
-             privacy_consent_at, privacy_notice_version
+             privacy_consent_at, privacy_notice_version, whatsapp_updates_consent_at
            )
-           VALUES ($1, 'website', 'pending', 'unpaid', $2, $3, $4, $5, $6, $7, $8::jsonb, $9, now(), $10)
+           VALUES ($1, 'website', 'pending', 'unpaid', $2, $3, $4, $5, $6, $7, $8::jsonb, $9, now(), $10,
+                   CASE WHEN $11 THEN now() ELSE NULL END)
            RETURNING id, order_number, placed_at`,
           [
             customerId,
@@ -193,7 +213,8 @@ export function registerOrderRoutes(app, { getDatabase, configuredOrigins = [], 
             orderInput.phone,
             addressSnapshot,
             orderInput.note || null,
-            '2026-10-04-v2',
+            '2026-10-05-v3',
+            orderInput.whatsappUpdatesAccepted,
           ],
         )
         const createdOrder = orderResult.rows[0]
@@ -249,6 +270,7 @@ export function registerOrderRoutes(app, { getDatabase, configuredOrigins = [], 
             payload: {
               orderNumber: createdOrder.order_number,
               status: 'pending',
+              fulfillmentMethod: orderInput.fulfillmentMethod,
               items: selectedItems.map((item) => ({
                 name: item.productName,
                 color: item.colorName,
@@ -256,6 +278,16 @@ export function registerOrderRoutes(app, { getDatabase, configuredOrigins = [], 
                 quantity: item.quantity,
               })),
             },
+          })
+        }
+        if (orderInput.whatsappUpdatesAccepted) {
+          await queueWhatsAppNotification(transaction, {
+            orderId: createdOrder.id,
+            statusEventId: statusEvent.rows[0].id,
+            recipientPhone: orderInput.whatsappPhone,
+            locale: orderInput.locale,
+            notificationType: 'order_received',
+            payload: { orderNumber: createdOrder.order_number },
           })
         }
 
